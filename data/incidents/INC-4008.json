@@ -1,0 +1,106 @@
+{
+  "incident_id": "INC-4008",
+  "tier": "eval",
+  "timestamp": "2026-04-01T21:51:00Z",
+  "service": "notification-service",
+  "environment": "production",
+  "severity": "SEV-3",
+  "symptoms": [
+    "notification latency increased",
+    "5xx increased"
+  ],
+  "metrics": {
+    "latency_p99_ms": 1147,
+    "error_rate_pct": 3.73,
+    "throughput_rps": 1022,
+    "db_connection_utilization": 0.55,
+    "redis_pool_utilization": 0.48,
+    "memory_utilization": 0.54,
+    "queue_depth": 19925,
+    "replicas_restarted_last_1h": 0
+  },
+  "logs": [
+    "req-59465 WARN  consumer lag 18400 messages on queue-fulfillment",
+    "req-59465 ERROR publish failed, broker unreachable (retrying)",
+    "req-59465 WARN  queue depth 21500 and growing",
+    "req-59465 ERROR message processing deadline exceeded"
+  ],
+  "recent_deployment": {
+    "id": "rel-1027",
+    "age_minutes": 986,
+    "author": "platform-team",
+    "summary": "dependency bump + config change"
+  },
+  "initial_hypotheses": [
+    "dependency saturation",
+    "recent regression",
+    "capacity exhaustion",
+    "configuration change"
+  ],
+  "investigation_steps": [
+    {
+      "order": 1,
+      "action": "check_metrics",
+      "result": "healthy",
+      "useful": false
+    },
+    {
+      "order": 2,
+      "action": "check_redis",
+      "result": "healthy",
+      "useful": false
+    },
+    {
+      "order": 3,
+      "action": "check_database",
+      "result": "healthy",
+      "useful": false
+    }
+  ],
+  "root_cause": "queue_backlog",
+  "resolution": "scale_consumers",
+  "failed_steps": [
+    "check_metrics",
+    "check_redis",
+    "check_database"
+  ],
+  "successful_steps": [],
+  "engineer_correction": null,
+  "time_to_resolution": 28,
+  "lesson": "Consumer lag was visible in metrics before any dependency check was needed.",
+  "dependencies": [
+    "queue-fulfillment",
+    "external-psp"
+  ],
+  "telemetry": {
+    "check_database": {
+      "status": "healthy",
+      "evidence": {
+        "connection_utilization": 0.45,
+        "active_connections": 30,
+        "lock_waits_per_min": 3,
+        "replication_lag_s": 1,
+        "slow_queries_over_1s": 2
+      }
+    },
+    "check_redis": {
+      "status": "healthy",
+      "evidence": {
+        "connection_pool_utilization": 0.36,
+        "timeouts_last_5m": 4,
+        "avg_latency_ms": 2,
+        "evicted_keys_last_5m": 1,
+        "connected_clients": 78
+      }
+    },
+    "check_recent_deployments": {
+      "status": "healthy",
+      "evidence": {
+        "deploys_last_24h": 0,
+        "last_deploy_age_minutes": 986,
+        "error_rate_delta_pct": 0.0,
+        "rollback_candidate": null
+      }
+    }
+  }
+}

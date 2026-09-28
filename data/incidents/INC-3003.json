@@ -1,0 +1,109 @@
+{
+  "incident_id": "INC-3003",
+  "tier": "replay",
+  "timestamp": "2026-03-19T06:54:00Z",
+  "service": "checkout-api",
+  "environment": "production",
+  "severity": "SEV-2",
+  "symptoms": [
+    "checkout latency increased",
+    "5xx increased"
+  ],
+  "metrics": {
+    "latency_p99_ms": 1917,
+    "error_rate_pct": 5.58,
+    "throughput_rps": 543,
+    "db_connection_utilization": 0.76,
+    "redis_pool_utilization": 0.44,
+    "memory_utilization": 0.7,
+    "queue_depth": 6,
+    "replicas_restarted_last_1h": 0
+  },
+  "logs": [
+    "req-28799 WARN  upstream timeout after 2000ms calling cache layer",
+    "req-28799 ERROR checkout.session.cache: no connection available in pool",
+    "req-28799 WARN  retrying cache read (attempt 2/3)",
+    "req-28799 ERROR upstream timeout exceeded threshold"
+  ],
+  "recent_deployment": {
+    "id": "rel-1018",
+    "age_minutes": 3271,
+    "author": "platform-team",
+    "summary": "dependency bump + config change"
+  },
+  "initial_hypotheses": [
+    "dependency saturation",
+    "recent regression",
+    "capacity exhaustion",
+    "configuration change"
+  ],
+  "investigation_steps": [
+    {
+      "order": 1,
+      "action": "check_redis",
+      "result": "anomaly_detected",
+      "useful": true
+    },
+    {
+      "order": 2,
+      "action": "check_recent_deployments",
+      "result": "healthy",
+      "useful": false
+    },
+    {
+      "order": 3,
+      "action": "check_database",
+      "result": "healthy",
+      "useful": false
+    }
+  ],
+  "root_cause": "redis_connection_exhaustion",
+  "resolution": "increase_connection_pool",
+  "failed_steps": [
+    "check_recent_deployments",
+    "check_database"
+  ],
+  "successful_steps": [
+    "check_redis"
+  ],
+  "engineer_correction": "Cache tier first on checkout-api. We have seen this four times now.",
+  "time_to_resolution": 21,
+  "lesson": "The cache tier was the highest-yield first check here; the database was ruled out quickly and was not the cause.",
+  "dependencies": [
+    "payment-api",
+    "auth-service",
+    "redis-checkout",
+    "postgres-orders"
+  ],
+  "telemetry": {
+    "check_database": {
+      "status": "healthy",
+      "evidence": {
+        "connection_utilization": 0.44,
+        "active_connections": 52,
+        "lock_waits_per_min": 3,
+        "replication_lag_s": 1,
+        "slow_queries_over_1s": 0
+      }
+    },
+    "check_redis": {
+      "status": "degraded",
+      "evidence": {
+        "connection_pool_utilization": 0.95,
+        "timeouts_last_5m": 177,
+        "avg_latency_ms": 1094,
+        "evicted_keys_last_5m": 908,
+        "connected_clients": 425
+      }
+    },
+    "check_recent_deployments": {
+      "status": "healthy",
+      "evidence": {
+        "deploys_last_24h": 0,
+        "last_deploy_age_minutes": 3271,
+        "error_rate_delta_pct": 0.0,
+        "rollback_candidate": null
+      }
+    }
+  }
+}

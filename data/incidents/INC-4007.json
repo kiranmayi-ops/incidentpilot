@@ -1,0 +1,106 @@
+{
+  "incident_id": "INC-4007",
+  "tier": "eval",
+  "timestamp": "2026-03-27T14:38:00Z",
+  "service": "catalog-service",
+  "environment": "production",
+  "severity": "SEV-3",
+  "symptoms": [
+    "catalog latency increased",
+    "5xx increased"
+  ],
+  "metrics": {
+    "latency_p99_ms": 1845,
+    "error_rate_pct": 3.45,
+    "throughput_rps": 967,
+    "db_connection_utilization": 0.67,
+    "redis_pool_utilization": 0.32,
+    "memory_utilization": 0.7,
+    "queue_depth": 44,
+    "replicas_restarted_last_1h": 0
+  },
+  "logs": [
+    "req-11721 ERROR upstream psp.example HTTP 503 Service Unavailable",
+    "req-11721 WARN  circuit breaker half-open for psp.example",
+    "req-11721 ERROR external call timeout after 3000ms",
+    "req-11721 WARN  retry storm detected for psp.example"
+  ],
+  "recent_deployment": {
+    "id": "rel-1026",
+    "age_minutes": 2089,
+    "author": "platform-team",
+    "summary": "dependency bump + config change"
+  },
+  "initial_hypotheses": [
+    "dependency saturation",
+    "recent regression",
+    "capacity exhaustion",
+    "configuration change"
+  ],
+  "investigation_steps": [
+    {
+      "order": 1,
+      "action": "check_metrics",
+      "result": "healthy",
+      "useful": false
+    },
+    {
+      "order": 2,
+      "action": "check_database",
+      "result": "healthy",
+      "useful": false
+    },
+    {
+      "order": 3,
+      "action": "check_recent_deployments",
+      "result": "healthy",
+      "useful": false
+    }
+  ],
+  "root_cause": "external_api_failure",
+  "resolution": "enable_circuit_breaker",
+  "failed_steps": [
+    "check_metrics",
+    "check_database",
+    "check_recent_deployments"
+  ],
+  "successful_steps": [],
+  "engineer_correction": null,
+  "time_to_resolution": 26,
+  "lesson": "Metrics plus logs identified the failing external dependency; internal dependency checks were low-yield.",
+  "dependencies": [
+    "postgres-catalog",
+    "search-index"
+  ],
+  "telemetry": {
+    "check_database": {
+      "status": "healthy",
+      "evidence": {
+        "connection_utilization": 0.32,
+        "active_connections": 39,
+        "lock_waits_per_min": 3,
+        "replication_lag_s": 0,
+        "slow_queries_over_1s": 0
+      }
+    },
+    "check_redis": {
+      "status": "healthy",
+      "evidence": {
+        "connection_pool_utilization": 0.39,
+        "timeouts_last_5m": 3,
+        "avg_latency_ms": 1,
+        "evicted_keys_last_5m": 5,
+        "connected_clients": 68
+      }
+    },
+    "check_recent_deployments": {
+      "status": "healthy",
+      "evidence": {
+        "deploys_last_24h": 0,
+        "last_deploy_age_minutes": 2089,
+        "error_rate_delta_pct": 0.0,
+        "rollback_candidate": null
+      }
+    }
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "incident_id": "INC-1013",
+  "tier": "tier1",
+  "timestamp": "2026-05-13T12:36:00Z",
+  "service": "payment-api",
+  "environment": "production",
+  "severity": "SEV-1",
+  "symptoms": [
+    "payment 5xx spike",
+    "latency increased"
+  ],
+  "metrics": {
+    "latency_p99_ms": 1549,
+    "error_rate_pct": 8.2,
+    "throughput_rps": 926,
+    "db_connection_utilization": 0.5,
+    "redis_pool_utilization": 0.39,
+    "memory_utilization": 0.93,
+    "queue_depth": 18,
+    "replicas_restarted_last_1h": 2
+  },
+  "logs": [
+    "req-61472 ERROR panic: nil pointer dereference in OrderSummary.render",
+    "req-61472 ERROR unhandled TypeError in totals calculation",
+    "req-61472 WARN  500s concentrated on pods from latest rollout",
+    "req-61472 ERROR feature flag default path is throwing"
+  ],
+  "recent_deployment": {
+    "id": "rel-1012",
+    "age_minutes": 37,
+    "author": "platform-team",
+    "summary": "dependency bump + config change"
+  },
+  "initial_hypotheses": [
+    "dependency saturation",
+    "recent regression",
+    "capacity exhaustion",
+    "configuration change"
+  ],
+  "investigation_steps": [
+    {
+      "order": 1,
+      "action": "check_recent_deployments",
+      "result": "anomaly_detected",
+      "useful": true
+    },
+    {
+      "order": 2,
+      "action": "check_database",
+      "result": "healthy",
+      "useful": false
+    },
+    {
+      "order": 3,
+      "action": "check_redis",
+      "result": "healthy",
+      "useful": false
+    }
+  ],
+  "root_cause": "bad_deployment",
+  "resolution": "rollback_deployment",
+  "failed_steps": [
+    "check_database",
+    "check_redis"
+  ],
+  "successful_steps": [
+    "check_recent_deployments"
+  ],
+  "engineer_correction": null,
+  "time_to_resolution": 12,
+  "lesson": "Correlating the alert with the most recent rollout found the cause fastest; dependency checks were not useful.",
+  "dependencies": [
+    "external-psp",
+    "postgres-orders",
+    "redis-sessions"
+  ],
+  "telemetry": {
+    "check_database": {
+      "status": "healthy",
+      "evidence": {
+        "connection_utilization": 0.42,
+        "active_connections": 50,
+        "lock_waits_per_min": 2,
+        "replication_lag_s": 0,
+        "slow_queries_over_1s": 1
+      }
+    },
+    "check_redis": {
+      "status": "healthy",
+      "evidence": {
+        "connection_pool_utilization": 0.33,
+        "timeouts_last_5m": 0,
+        "avg_latency_ms": 1,
+        "evicted_keys_last_5m": 4,
+        "connected_clients": 55
+      }
+    },
+    "check_recent_deployments": {
+      "status": "degraded",
+      "evidence": {
+        "deploys_last_24h": 1,
+        "last_deploy_age_minutes": 37,
+        "error_rate_delta_pct": 4.4,
+        "rollback_candidate": "rel-6938"
+      }
+    }
+  }
+}

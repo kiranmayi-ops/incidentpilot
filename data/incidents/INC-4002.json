@@ -1,0 +1,109 @@
+{
+  "incident_id": "INC-4002",
+  "tier": "eval",
+  "timestamp": "2026-06-22T03:33:00Z",
+  "service": "checkout-api",
+  "environment": "production",
+  "severity": "SEV-2",
+  "symptoms": [
+    "checkout latency increased",
+    "5xx increased"
+  ],
+  "metrics": {
+    "latency_p99_ms": 2058,
+    "error_rate_pct": 8.31,
+    "throughput_rps": 523,
+    "db_connection_utilization": 0.75,
+    "redis_pool_utilization": 0.43,
+    "memory_utilization": 0.93,
+    "queue_depth": 13,
+    "replicas_restarted_last_1h": 1
+  },
+  "logs": [
+    "req-27848 ERROR panic: nil pointer dereference in OrderSummary.render",
+    "req-27848 ERROR unhandled TypeError in totals calculation",
+    "req-27848 WARN  500s concentrated on pods from latest rollout",
+    "req-27848 ERROR feature flag default path is throwing"
+  ],
+  "recent_deployment": {
+    "id": "rel-1021",
+    "age_minutes": 19,
+    "author": "platform-team",
+    "summary": "dependency bump + config change"
+  },
+  "initial_hypotheses": [
+    "dependency saturation",
+    "recent regression",
+    "capacity exhaustion",
+    "configuration change"
+  ],
+  "investigation_steps": [
+    {
+      "order": 1,
+      "action": "check_recent_deployments",
+      "result": "anomaly_detected",
+      "useful": true
+    },
+    {
+      "order": 2,
+      "action": "check_database",
+      "result": "healthy",
+      "useful": false
+    },
+    {
+      "order": 3,
+      "action": "check_redis",
+      "result": "healthy",
+      "useful": false
+    }
+  ],
+  "root_cause": "bad_deployment",
+  "resolution": "rollback_deployment",
+  "failed_steps": [
+    "check_database",
+    "check_redis"
+  ],
+  "successful_steps": [
+    "check_recent_deployments"
+  ],
+  "engineer_correction": null,
+  "time_to_resolution": 14,
+  "lesson": "Correlating the alert with the most recent rollout found the cause fastest; dependency checks were not useful.",
+  "dependencies": [
+    "payment-api",
+    "auth-service",
+    "redis-checkout",
+    "postgres-orders"
+  ],
+  "telemetry": {
+    "check_database": {
+      "status": "healthy",
+      "evidence": {
+        "connection_utilization": 0.32,
+        "active_connections": 50,
+        "lock_waits_per_min": 3,
+        "replication_lag_s": 2,
+        "slow_queries_over_1s": 2
+      }
+    },
+    "check_redis": {
+      "status": "healthy",
+      "evidence": {
+        "connection_pool_utilization": 0.32,
+        "timeouts_last_5m": 1,
+        "avg_latency_ms": 2,
+        "evicted_keys_last_5m": 7,
+        "connected_clients": 85
+      }
+    },
+    "check_recent_deployments": {
+      "status": "degraded",
+      "evidence": {
+        "deploys_last_24h": 1,
+        "last_deploy_age_minutes": 19,
+        "error_rate_delta_pct": 7.5,
+        "rollback_candidate": "rel-3899"
+      }
+    }
+  }
+}

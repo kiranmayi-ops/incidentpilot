@@ -1,0 +1,107 @@
+{
+  "incident_id": "INC-1012",
+  "tier": "tier1",
+  "timestamp": "2026-04-12T05:23:00Z",
+  "service": "order-service",
+  "environment": "production",
+  "severity": "SEV-3",
+  "symptoms": [
+    "order service pod restarts",
+    "latency increased"
+  ],
+  "metrics": {
+    "latency_p99_ms": 2510,
+    "error_rate_pct": 1.96,
+    "throughput_rps": 756,
+    "db_connection_utilization": 0.55,
+    "redis_pool_utilization": 0.39,
+    "memory_utilization": 0.93,
+    "queue_depth": 43,
+    "replicas_restarted_last_1h": 0
+  },
+  "logs": [
+    "req-42286 WARN  heap usage 93% of limit, GC pressure rising",
+    "req-42286 WARN  long pause 1.8s during mark-sweep",
+    "req-42286 ERROR container OOMKilled risk, rss=3.9Gi",
+    "req-42286 WARN  allocation rate 2.4x baseline"
+  ],
+  "recent_deployment": {
+    "id": "rel-1011",
+    "age_minutes": 3534,
+    "author": "platform-team",
+    "summary": "dependency bump + config change"
+  },
+  "initial_hypotheses": [
+    "dependency saturation",
+    "recent regression",
+    "capacity exhaustion",
+    "configuration change"
+  ],
+  "investigation_steps": [
+    {
+      "order": 1,
+      "action": "check_recent_deployments",
+      "result": "healthy",
+      "useful": false
+    },
+    {
+      "order": 2,
+      "action": "check_metrics",
+      "result": "healthy",
+      "useful": false
+    },
+    {
+      "order": 3,
+      "action": "check_database",
+      "result": "healthy",
+      "useful": false
+    }
+  ],
+  "root_cause": "memory_leak",
+  "resolution": "rollback_and_fix_leak",
+  "failed_steps": [
+    "check_recent_deployments",
+    "check_metrics",
+    "check_database"
+  ],
+  "successful_steps": [],
+  "engineer_correction": null,
+  "time_to_resolution": 44,
+  "lesson": "A recent change correlated with memory growth; the database and cache tier were both healthy.",
+  "dependencies": [
+    "postgres-orders",
+    "queue-fulfillment",
+    "redis-checkout"
+  ],
+  "telemetry": {
+    "check_database": {
+      "status": "healthy",
+      "evidence": {
+        "connection_utilization": 0.44,
+        "active_connections": 45,
+        "lock_waits_per_min": 3,
+        "replication_lag_s": 1,
+        "slow_queries_over_1s": 0
+      }
+    },
+    "check_redis": {
+      "status": "healthy",
+      "evidence": {
+        "connection_pool_utilization": 0.38,
+        "timeouts_last_5m": 0,
+        "avg_latency_ms": 4,
+        "evicted_keys_last_5m": 8,
+        "connected_clients": 48
+      }
+    },
+    "check_recent_deployments": {
+      "status": "healthy",
+      "evidence": {
+        "deploys_last_24h": 1,
+        "last_deploy_age_minutes": 3534,
+        "error_rate_delta_pct": 0.0,
+        "rollback_candidate": null
+      }
+    }
+  }
+}

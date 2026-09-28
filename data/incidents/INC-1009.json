@@ -1,0 +1,107 @@
+{
+  "incident_id": "INC-1009",
+  "tier": "tier1",
+  "timestamp": "2026-01-09T08:44:00Z",
+  "service": "auth-service",
+  "environment": "production",
+  "severity": "SEV-2",
+  "symptoms": [
+    "login latency increased",
+    "5xx increased"
+  ],
+  "metrics": {
+    "latency_p99_ms": 1587,
+    "error_rate_pct": 4.85,
+    "throughput_rps": 765,
+    "db_connection_utilization": 0.88,
+    "redis_pool_utilization": 0.45,
+    "memory_utilization": 0.6,
+    "queue_depth": 85,
+    "replicas_restarted_last_1h": 0
+  },
+  "logs": [
+    "req-66734 ERROR db.pool: connection pool saturated (waiting 4.2s)",
+    "req-66734 WARN  lock wait detected on orders_pkey",
+    "req-66734 ERROR query timeout after 5000ms",
+    "req-66734 WARN  pool waiters=57"
+  ],
+  "recent_deployment": {
+    "id": "rel-1008",
+    "age_minutes": 3096,
+    "author": "platform-team",
+    "summary": "dependency bump + config change"
+  },
+  "initial_hypotheses": [
+    "dependency saturation",
+    "recent regression",
+    "capacity exhaustion",
+    "configuration change"
+  ],
+  "investigation_steps": [
+    {
+      "order": 1,
+      "action": "check_database",
+      "result": "anomaly_detected",
+      "useful": true
+    },
+    {
+      "order": 2,
+      "action": "check_redis",
+      "result": "healthy",
+      "useful": false
+    },
+    {
+      "order": 3,
+      "action": "check_recent_deployments",
+      "result": "healthy",
+      "useful": false
+    }
+  ],
+  "root_cause": "database_connection_exhaustion",
+  "resolution": "scale_db_connection_pool",
+  "failed_steps": [
+    "check_redis",
+    "check_recent_deployments"
+  ],
+  "successful_steps": [
+    "check_database"
+  ],
+  "engineer_correction": null,
+  "time_to_resolution": 31,
+  "lesson": "Checking the database first was the fastest route to useful evidence; the cache tier was not involved.",
+  "dependencies": [
+    "redis-sessions",
+    "postgres-users"
+  ],
+  "telemetry": {
+    "check_database": {
+      "status": "degraded",
+      "evidence": {
+        "connection_utilization": 0.94,
+        "active_connections": 233,
+        "lock_waits_per_min": 347,
+        "replication_lag_s": 39,
+        "slow_queries_over_1s": 164
+      }
+    },
+    "check_redis": {
+      "status": "healthy",
+      "evidence": {
+        "connection_pool_utilization": 0.45,
+        "timeouts_last_5m": 1,
+        "avg_latency_ms": 3,
+        "evicted_keys_last_5m": 1,
+        "connected_clients": 70
+      }
+    },
+    "check_recent_deployments": {
+      "status": "healthy",
+      "evidence": {
+        "deploys_last_24h": 1,
+        "last_deploy_age_minutes": 3096,
+        "error_rate_delta_pct": 0.0,
+        "rollback_candidate": null
+      }
+    }
+  }
+}

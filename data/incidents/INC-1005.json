@@ -1,0 +1,107 @@
+{
+  "incident_id": "INC-1005",
+  "tier": "tier1",
+  "timestamp": "2026-05-05T04:52:00Z",
+  "service": "catalog-service",
+  "environment": "production",
+  "severity": "SEV-3",
+  "symptoms": [
+    "catalog 5xx increased",
+    "latency increased"
+  ],
+  "metrics": {
+    "latency_p99_ms": 1702,
+    "error_rate_pct": 6.72,
+    "throughput_rps": 1033,
+    "db_connection_utilization": 0.72,
+    "redis_pool_utilization": 0.49,
+    "memory_utilization": 0.92,
+    "queue_depth": 6,
+    "replicas_restarted_last_1h": 3
+  },
+  "logs": [
+    "req-12220 ERROR panic: nil pointer dereference in OrderSummary.render",
+    "req-12220 ERROR unhandled TypeError in totals calculation",
+    "req-12220 WARN  500s concentrated on pods from latest rollout",
+    "req-12220 ERROR feature flag default path is throwing"
+  ],
+  "recent_deployment": {
+    "id": "rel-1004",
+    "age_minutes": 27,
+    "author": "platform-team",
+    "summary": "dependency bump + config change"
+  },
+  "initial_hypotheses": [
+    "dependency saturation",
+    "recent regression",
+    "capacity exhaustion",
+    "configuration change"
+  ],
+  "investigation_steps": [
+    {
+      "order": 1,
+      "action": "check_recent_deployments",
+      "result": "anomaly_detected",
+      "useful": true
+    },
+    {
+      "order": 2,
+      "action": "check_database",
+      "result": "healthy",
+      "useful": false
+    },
+    {
+      "order": 3,
+      "action": "check_redis",
+      "result": "healthy",
+      "useful": false
+    }
+  ],
+  "root_cause": "bad_deployment",
+  "resolution": "rollback_deployment",
+  "failed_steps": [
+    "check_database",
+    "check_redis"
+  ],
+  "successful_steps": [
+    "check_recent_deployments"
+  ],
+  "engineer_correction": null,
+  "time_to_resolution": 15,
+  "lesson": "Correlating the alert with the most recent rollout found the cause fastest; dependency checks were not useful.",
+  "dependencies": [
+    "postgres-catalog",
+    "search-index"
+  ],
+  "telemetry": {
+    "check_database": {
+      "status": "healthy",
+      "evidence": {
+        "connection_utilization": 0.45,
+        "active_connections": 51,
+        "lock_waits_per_min": 2,
+        "replication_lag_s": 1,
+        "slow_queries_over_1s": 2
+      }
+    },
+    "check_redis": {
+      "status": "healthy",
+      "evidence": {
+        "connection_pool_utilization": 0.35,
+        "timeouts_last_5m": 3,
+        "avg_latency_ms": 4,
+        "evicted_keys_last_5m": 8,
+        "connected_clients": 56
+      }
+    },
+    "check_recent_deployments": {
+      "status": "degraded",
+      "evidence": {
+        "deploys_last_24h": 1,
+        "last_deploy_age_minutes": 27,
+        "error_rate_delta_pct": 9.4,
+        "rollback_candidate": "rel-2170"
+      }
+    }
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "incident_id": "INC-4005",
+  "tier": "eval",
+  "timestamp": "2026-01-25T00:12:00Z",
+  "service": "user-service",
+  "environment": "production",
+  "severity": "SEV-2",
+  "symptoms": [
+    "user profile latency increased",
+    "5xx increased"
+  ],
+  "metrics": {
+    "latency_p99_ms": 1958,
+    "error_rate_pct": 5.1,
+    "throughput_rps": 552,
+    "db_connection_utilization": 0.4,
+    "redis_pool_utilization": 0.43,
+    "memory_utilization": 0.74,
+    "queue_depth": 78,
+    "replicas_restarted_last_1h": 0
+  },
+  "logs": [
+    "req-88591 WARN  upstream timeout after 2000ms calling cache layer",
+    "req-88591 ERROR checkout.session.cache: no connection available in pool",
+    "req-88591 WARN  retrying cache read (attempt 2/3)",
+    "req-88591 ERROR upstream timeout exceeded threshold"
+  ],
+  "recent_deployment": {
+    "id": "rel-1024",
+    "age_minutes": 760,
+    "author": "platform-team",
+    "summary": "dependency bump + config change"
+  },
+  "initial_hypotheses": [
+    "dependency saturation",
+    "recent regression",
+    "capacity exhaustion",
+    "configuration change"
+  ],
+  "investigation_steps": [
+    {
+      "order": 1,
+      "action": "check_redis",
+      "result": "anomaly_detected",
+      "useful": true
+    },
+    {
+      "order": 2,
+      "action": "check_recent_deployments",
+      "result": "healthy",
+      "useful": false
+    },
+    {
+      "order": 3,
+      "action": "check_database",
+      "result": "healthy",
+      "useful": false
+    }
+  ],
+  "root_cause": "redis_connection_exhaustion",
+  "resolution": "increase_connection_pool",
+  "failed_steps": [
+    "check_recent_deployments",
+    "check_database"
+  ],
+  "successful_steps": [
+    "check_redis"
+  ],
+  "engineer_correction": null,
+  "time_to_resolution": 18,
+  "lesson": "The cache tier was the highest-yield first check here; the database was ruled out quickly and was not the cause.",
+  "dependencies": [
+    "postgres-users",
+    "redis-sessions"
+  ],
+  "telemetry": {
+    "check_database": {
+      "status": "healthy",
+      "evidence": {
+        "connection_utilization": 0.36,
+        "active_connections": 49,
+        "lock_waits_per_min": 0,
+        "replication_lag_s": 1,
+        "slow_queries_over_1s": 2
+      }
+    },
+    "check_redis": {
+      "status": "degraded",
+      "evidence": {
+        "connection_pool_utilization": 0.95,
+        "timeouts_last_5m": 250,
+        "avg_latency_ms": 1040,
+        "evicted_keys_last_5m": 1112,
+        "connected_clients": 441
+      }
+    },
+    "check_recent_deployments": {
+      "status": "healthy",
+      "evidence": {
+        "deploys_last_24h": 0,
+        "last_deploy_age_minutes": 760,
+        "error_rate_delta_pct": 0.0,
+        "rollback_candidate": null
+      }
+    }
+  }
+}
