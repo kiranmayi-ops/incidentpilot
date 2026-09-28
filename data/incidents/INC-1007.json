@@ -67,9 +67,11 @@
   "engineer_correction": null,
   "time_to_resolution": 37,
   "lesson": "Metrics plus logs identified the failing external dependency; internal dependency checks were low-yield.",
-  "dependencies": [
-    "search-index",
+  "service_dependencies": [
     "catalog-service"
+  ],
+  "infra_dependencies": [
+    "search-index"
   ],
   "telemetry": {
     "check_database": {

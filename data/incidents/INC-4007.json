@@ -67,7 +67,8 @@
   "engineer_correction": null,
   "time_to_resolution": 26,
   "lesson": "Metrics plus logs identified the failing external dependency; internal dependency checks were low-yield.",
-  "dependencies": [
+  "service_dependencies": [],
+  "infra_dependencies": [
     "postgres-catalog",
     "search-index"
   ],

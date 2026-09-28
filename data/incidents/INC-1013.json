@@ -68,7 +68,8 @@
   "engineer_correction": null,
   "time_to_resolution": 12,
   "lesson": "Correlating the alert with the most recent rollout found the cause fastest; dependency checks were not useful.",
-  "dependencies": [
+  "service_dependencies": [],
+  "infra_dependencies": [
     "external-psp",
     "postgres-orders",
     "redis-sessions"

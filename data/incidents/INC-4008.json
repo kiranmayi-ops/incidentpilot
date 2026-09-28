@@ -67,7 +67,8 @@
   "engineer_correction": null,
   "time_to_resolution": 28,
   "lesson": "Consumer lag was visible in metrics before any dependency check was needed.",
-  "dependencies": [
+  "service_dependencies": [],
+  "infra_dependencies": [
     "queue-fulfillment",
     "external-psp"
   ],

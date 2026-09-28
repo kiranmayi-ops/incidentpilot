@@ -68,9 +68,11 @@
   "engineer_correction": null,
   "time_to_resolution": 18,
   "lesson": "Correlating the alert with the most recent rollout found the cause fastest; dependency checks were not useful.",
-  "dependencies": [
-    "search-index",
+  "service_dependencies": [
     "catalog-service"
+  ],
+  "infra_dependencies": [
+    "search-index"
   ],
   "telemetry": {
     "check_database": {

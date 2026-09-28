@@ -68,9 +68,11 @@
   "engineer_correction": null,
   "time_to_resolution": 14,
   "lesson": "Correlating the alert with the most recent rollout found the cause fastest; dependency checks were not useful.",
-  "dependencies": [
+  "service_dependencies": [
     "payment-api",
-    "auth-service",
+    "auth-service"
+  ],
+  "infra_dependencies": [
     "redis-checkout",
     "postgres-orders"
   ],

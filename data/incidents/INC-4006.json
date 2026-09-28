@@ -67,7 +67,8 @@
   "engineer_correction": null,
   "time_to_resolution": 39,
   "lesson": "A recent change correlated with memory growth; the database and cache tier were both healthy.",
-  "dependencies": [
+  "service_dependencies": [],
+  "infra_dependencies": [
     "redis-sessions",
     "postgres-users"
   ],

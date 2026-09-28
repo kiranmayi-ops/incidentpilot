@@ -110,7 +110,9 @@ def render_current_evidence(incident: Incident) -> str:
         f"current metrics:\n{metrics}\n"
         f"recent log lines:\n{logs}\n"
         f"most recent deployment: {deploy}\n"
-        f"known dependencies: {', '.join(incident.dependencies) or 'unknown'}"
+        f"known service dependencies: {', '.join(incident.service_dependencies) or 'unknown'}\n"
+        "    note: infrastructure tiers are not enumerated here; discover them by "
+        "running the relevant check tools."
     )
 
 

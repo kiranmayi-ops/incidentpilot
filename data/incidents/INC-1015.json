@@ -68,7 +68,8 @@
   "engineer_correction": null,
   "time_to_resolution": 33,
   "lesson": "Checking the database first was the fastest route to useful evidence; the cache tier was not involved.",
-  "dependencies": [
+  "service_dependencies": [],
+  "infra_dependencies": [
     "postgres-users",
     "redis-sessions"
   ],

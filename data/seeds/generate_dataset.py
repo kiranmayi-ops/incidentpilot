@@ -60,6 +60,22 @@ SERVICE_DEPENDENCIES: dict[str, list[str]] = {
     "search-service": ["search-index", "catalog-service"],
 }
 
+# Infrastructure tiers are deliberately split out of the pre-tool evidence.
+# An alert payload naming "redis-checkout" hands the agent the answer, since
+# redis exhaustion is the true cause of the demo incidents. Infra topology is
+# instead DISCOVERED by running check_redis / check_database, or recalled from
+# the Tier 1 Hindsight memory seed which retains the full dependency map.
+_INFRA_PREFIXES = ("redis-", "postgres-", "queue-", "search-index", "external-")
+
+
+def _split(service: str) -> tuple[list[str], list[str]]:
+    """Return ``(service_dependencies, infra_dependencies)`` for a service."""
+    svc: list[str] = []
+    infra: list[str] = []
+    for dep in SERVICE_DEPENDENCIES.get(service, []):
+        (infra if dep.startswith(_INFRA_PREFIXES) else svc).append(dep)
+    return svc, infra
+
 
 # ---------------------------------------------------------------------------
 # Telemetry templates
@@ -165,13 +181,21 @@ def build_telemetry(root_cause: str, rng: random.Random) -> dict[str, Any]:
 
 
 def build_logs(root_cause: str, service: str, rng: random.Random) -> list[str]:
+    """Request-level log lines as seen BEFORE any diagnostic tool runs.
+
+    These must stay deliberately generic about *which dependency* failed:
+    an alert saying "calling cache layer / no connection available in pool"
+    hands the baseline the answer, and the spec requires that redis evidence
+    appear only once check_redis has been executed. Tier-specific diagnosis
+    lives in the per-tool telemetry instead.
+    """
     rid = f"req-{rng.randint(10000, 99999)}"
     if root_cause == "redis_connection_exhaustion":
         return [
-            f"{rid} WARN  upstream timeout after 2000ms calling cache layer",
-            f"{rid} ERROR checkout.session.cache: no connection available in pool",
-            f"{rid} WARN  retrying cache read (attempt 2/3)",
+            f"{rid} WARN  upstream timeout after 2000ms",
             f"{rid} ERROR upstream timeout exceeded threshold",
+            f"{rid} WARN  retrying upstream call (attempt 2/3)",
+            f"{rid} ERROR 5xx returned to client",
         ]
     if root_cause == "database_connection_exhaustion":
         return [
@@ -506,7 +530,13 @@ def build_incident(spec: dict[str, Any], index: int) -> dict[str, Any]:
         "engineer_correction": spec.get("correction"),
         "time_to_resolution": spec["ttr"],
         "lesson": LESSONS[root_cause],
-        "dependencies": SERVICE_DEPENDENCIES.get(service, []),
+        # Pre-tool evidence shows service_dependencies only. Infra tiers are
+        # DISCOVERED by investigating (or recalled from memory), because
+        # naming the cache tier in the alert payload hands the agent the
+        # answer: the live baseline started with check_redis on every
+        # checkout-api incident until this was fixed.
+        "service_dependencies": _split(service)[0],
+        "infra_dependencies": _split(service)[1],
         # raw, incident-scoped telemetry used by the tools
         "telemetry": telemetry,
     }

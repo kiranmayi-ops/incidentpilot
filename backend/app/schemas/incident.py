@@ -62,6 +62,10 @@ class Incident(BaseModel):
     time_to_resolution: int
     lesson: str
     dependencies: list[str] = Field(default_factory=list)
+    # Infra tiers are withheld from pre-tool evidence on purpose: naming the
+    # cache tier in the alert payload hands the agent the answer.
+    service_dependencies: list[str] = Field(default_factory=list)
+    infra_dependencies: list[str] = Field(default_factory=list)
     telemetry: dict[str, TelemetryComponent] = Field(default_factory=dict)
 
 

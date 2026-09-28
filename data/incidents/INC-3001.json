@@ -19,10 +19,10 @@
     "replicas_restarted_last_1h": 0
   },
   "logs": [
-    "req-57106 WARN  upstream timeout after 2000ms calling cache layer",
-    "req-57106 ERROR checkout.session.cache: no connection available in pool",
-    "req-57106 WARN  retrying cache read (attempt 2/3)",
-    "req-57106 ERROR upstream timeout exceeded threshold"
+    "req-57106 WARN  upstream timeout after 2000ms",
+    "req-57106 ERROR upstream timeout exceeded threshold",
+    "req-57106 WARN  retrying upstream call (attempt 2/3)",
+    "req-57106 ERROR 5xx returned to client"
   ],
   "recent_deployment": {
     "id": "rel-1016",
@@ -68,9 +68,11 @@
   "engineer_correction": "For checkout-api latency with 5xx, check Redis earlier.",
   "time_to_resolution": 19,
   "lesson": "The cache tier was the highest-yield first check here; the database was ruled out quickly and was not the cause.",
-  "dependencies": [
+  "service_dependencies": [
     "payment-api",
-    "auth-service",
+    "auth-service"
+  ],
+  "infra_dependencies": [
     "redis-checkout",
     "postgres-orders"
   ],

@@ -67,7 +67,8 @@
   "engineer_correction": null,
   "time_to_resolution": 27,
   "lesson": "Metrics plus logs identified the failing external dependency; internal dependency checks were low-yield.",
-  "dependencies": [
+  "service_dependencies": [],
+  "infra_dependencies": [
     "queue-fulfillment",
     "external-psp"
   ],

@@ -19,10 +19,10 @@
     "replicas_restarted_last_1h": 0
   },
   "logs": [
-    "req-47129 WARN  upstream timeout after 2000ms calling cache layer",
-    "req-47129 ERROR checkout.session.cache: no connection available in pool",
-    "req-47129 WARN  retrying cache read (attempt 2/3)",
-    "req-47129 ERROR upstream timeout exceeded threshold"
+    "req-47129 WARN  upstream timeout after 2000ms",
+    "req-47129 ERROR upstream timeout exceeded threshold",
+    "req-47129 WARN  retrying upstream call (attempt 2/3)",
+    "req-47129 ERROR 5xx returned to client"
   ],
   "recent_deployment": {
     "id": "rel-1024",
@@ -68,7 +68,8 @@
   "engineer_correction": null,
   "time_to_resolution": 18,
   "lesson": "The cache tier was the highest-yield first check here; the database was ruled out quickly and was not the cause.",
-  "dependencies": [
+  "service_dependencies": [],
+  "infra_dependencies": [
     "postgres-users",
     "redis-sessions"
   ],

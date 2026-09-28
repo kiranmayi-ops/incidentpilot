@@ -67,9 +67,11 @@
   "engineer_correction": null,
   "time_to_resolution": 36,
   "lesson": "Consumer lag was visible in metrics before any dependency check was needed.",
-  "dependencies": [
-    "search-index",
+  "service_dependencies": [
     "catalog-service"
+  ],
+  "infra_dependencies": [
+    "search-index"
   ],
   "telemetry": {
     "check_database": {

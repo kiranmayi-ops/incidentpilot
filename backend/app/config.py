@@ -56,6 +56,16 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0
     llm_seed: int | None = 1234
     llm_max_retries: int = 2
+    # Explicit output budget. Reasoning models (gpt-oss, o-series) spend
+    # completion tokens on hidden reasoning, so a small or implicit budget can
+    # return an empty `content` even on success.
+    llm_max_tokens: int = 2048
+    # Passed through to providers that support it (Groq gpt-oss). Left empty
+    # to disable. Strategy calls do not need deep reasoning.
+    llm_reasoning_effort: str = "low"
+    # Ask OpenAI-compatible providers for a JSON object response. Providers
+    # that reject it are detected at runtime and the parameter is dropped.
+    llm_json_mode: bool = True
 
     # paths
     data_dir: Path = Field(default=DATA_DIR)
