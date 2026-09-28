@@ -8,6 +8,8 @@ POST /incidents/{id}/resolve      — engineer applies a resolution
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +45,14 @@ def _bad(exc: Exception, status: int = 400) -> HTTPException:
     return HTTPException(status_code=status, detail=str(exc))
 
 
+def _dedup(ids: Iterable[str]) -> list[str]:
+    seen: list[str] = []
+    for i in ids:
+        if i not in seen:
+            seen.append(i)
+    return seen
+
+
 @router.post("/{incident_id}/investigate", response_model=InvestigateResponse)
 async def investigate(
     incident_id: str,
@@ -68,9 +78,9 @@ async def investigate(
         recall=RecallSummary(
             query=run.recall_query or "",
             count=run.recalled_count or 0,
-            incident_ids=[
+            incident_ids=_dedup(
                 i for m in (run.recalled_raw or []) for i in (m.get("incident_ids") or [])
-            ],
+            ),
             memory_ready=bool(run.memory_ready),
             note=None if run.memory_ready else "memory recall disabled for baseline",
         ),
