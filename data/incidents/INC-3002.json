@@ -13,9 +13,8 @@
     "latency_p99_ms": 1960,
     "error_rate_pct": 5.48,
     "throughput_rps": 567,
-    "db_connection_utilization": 0.74,
-    "redis_pool_utilization": 0.46,
-    "memory_utilization": 0.72,
+    "db_connection_utilization": 0.75,
+    "memory_utilization": 0.71,
     "queue_depth": 37,
     "replicas_restarted_last_1h": 0
   },

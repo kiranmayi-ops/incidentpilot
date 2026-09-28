@@ -219,18 +219,23 @@ def build_logs(root_cause: str, service: str, rng: random.Random) -> list[str]:
 def build_metrics(
     root_cause: str, service: str, rng: random.Random, demo: bool = False
 ) -> dict[str, Any]:
-    """Metrics visible to the strategist before any tool call.
+    """Metrics visible to the strategist BEFORE any tool call.
 
-    For the ambiguous demo incidents these deliberately show an ELEVATED-BUT-
-    NOT-CRITICAL database pool, which is a legitimate reason for a memory-less
-    SRE agent to check the database first, and nothing at all about Redis.
+    NOTE: there is deliberately NO ``redis_pool_utilization`` here. The spec
+    requires that Redis evidence appears only when ``check_redis`` runs, so
+    exposing a Redis number up front would both leak the answer and wrongly
+    signal "cache is fine" on incidents where it is not.
+
+    For the ambiguous demo incidents the pre-tool metrics show an
+    ELEVATED-BUT-NOT-CRITICAL database pool, which is a legitimate reason for a
+    memory-less SRE agent to check the database first, and nothing about
+    Redis.
     """
     base: dict[str, Any] = {
         "latency_p99_ms": rng.randint(380, 900),
         "error_rate_pct": round(rng.uniform(0.4, 1.6), 2),
         "throughput_rps": rng.randint(700, 1500),
         "db_connection_utilization": round(rng.uniform(0.38, 0.72), 2),
-        "redis_pool_utilization": round(rng.uniform(0.30, 0.50), 2),
         "memory_utilization": round(rng.uniform(0.52, 0.74), 2),
         "queue_depth": rng.randint(0, 120),
         "replicas_restarted_last_1h": 0,
@@ -245,7 +250,6 @@ def build_metrics(
                 "error_rate_pct": round(rng.uniform(3.6, 5.2), 2),
                 "throughput_rps": rng.randint(520, 700),
                 "db_connection_utilization": round(rng.uniform(0.74, 0.81), 2),
-                "redis_pool_utilization": round(rng.uniform(0.38, 0.47), 2),
                 "memory_utilization": round(rng.uniform(0.66, 0.74), 2),
                 "queue_depth": rng.randint(0, 40),
             }

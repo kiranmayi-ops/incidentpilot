@@ -10,13 +10,12 @@
     "latency increased"
   ],
   "metrics": {
-    "latency_p99_ms": 1702,
-    "error_rate_pct": 6.72,
+    "latency_p99_ms": 2119,
+    "error_rate_pct": 4.21,
     "throughput_rps": 1033,
     "db_connection_utilization": 0.72,
-    "redis_pool_utilization": 0.49,
     "memory_utilization": 0.92,
-    "queue_depth": 6,
+    "queue_depth": 41,
     "replicas_restarted_last_1h": 3
   },
   "logs": [

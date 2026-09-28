@@ -14,8 +14,7 @@
     "error_rate_pct": 2.79,
     "throughput_rps": 1004,
     "db_connection_utilization": 0.71,
-    "redis_pool_utilization": 0.46,
-    "memory_utilization": 0.63,
+    "memory_utilization": 0.69,
     "queue_depth": 16646,
     "replicas_restarted_last_1h": 0
   },

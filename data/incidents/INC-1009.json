@@ -10,20 +10,19 @@
     "5xx increased"
   ],
   "metrics": {
-    "latency_p99_ms": 1587,
-    "error_rate_pct": 4.85,
+    "latency_p99_ms": 1568,
+    "error_rate_pct": 4.21,
     "throughput_rps": 765,
-    "db_connection_utilization": 0.88,
-    "redis_pool_utilization": 0.45,
-    "memory_utilization": 0.6,
-    "queue_depth": 85,
+    "db_connection_utilization": 0.96,
+    "memory_utilization": 0.69,
+    "queue_depth": 44,
     "replicas_restarted_last_1h": 0
   },
   "logs": [
-    "req-66734 ERROR db.pool: connection pool saturated (waiting 4.2s)",
-    "req-66734 WARN  lock wait detected on orders_pkey",
-    "req-66734 ERROR query timeout after 5000ms",
-    "req-66734 WARN  pool waiters=57"
+    "req-10526 ERROR db.pool: connection pool saturated (waiting 4.2s)",
+    "req-10526 WARN  lock wait detected on orders_pkey",
+    "req-10526 ERROR query timeout after 5000ms",
+    "req-10526 WARN  pool waiters=57"
   ],
   "recent_deployment": {
     "id": "rel-1008",

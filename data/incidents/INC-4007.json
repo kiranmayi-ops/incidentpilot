@@ -10,20 +10,19 @@
     "5xx increased"
   ],
   "metrics": {
-    "latency_p99_ms": 1845,
-    "error_rate_pct": 3.45,
+    "latency_p99_ms": 1505,
+    "error_rate_pct": 4.04,
     "throughput_rps": 967,
     "db_connection_utilization": 0.67,
-    "redis_pool_utilization": 0.32,
-    "memory_utilization": 0.7,
-    "queue_depth": 44,
+    "memory_utilization": 0.54,
+    "queue_depth": 103,
     "replicas_restarted_last_1h": 0
   },
   "logs": [
-    "req-11721 ERROR upstream psp.example HTTP 503 Service Unavailable",
-    "req-11721 WARN  circuit breaker half-open for psp.example",
-    "req-11721 ERROR external call timeout after 3000ms",
-    "req-11721 WARN  retry storm detected for psp.example"
+    "req-29533 ERROR upstream psp.example HTTP 503 Service Unavailable",
+    "req-29533 WARN  circuit breaker half-open for psp.example",
+    "req-29533 ERROR external call timeout after 3000ms",
+    "req-29533 WARN  retry storm detected for psp.example"
   ],
   "recent_deployment": {
     "id": "rel-1026",

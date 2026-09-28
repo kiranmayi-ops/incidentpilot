@@ -10,13 +10,12 @@
     "pod restarts observed"
   ],
   "metrics": {
-    "latency_p99_ms": 2064,
-    "error_rate_pct": 3.16,
+    "latency_p99_ms": 2535,
+    "error_rate_pct": 2.57,
     "throughput_rps": 977,
     "db_connection_utilization": 0.42,
-    "redis_pool_utilization": 0.38,
     "memory_utilization": 0.96,
-    "queue_depth": 61,
+    "queue_depth": 118,
     "replicas_restarted_last_1h": 0
   },
   "logs": [

@@ -10,20 +10,19 @@
     "5xx increased"
   ],
   "metrics": {
-    "latency_p99_ms": 1868,
-    "error_rate_pct": 4.01,
-    "throughput_rps": 691,
+    "latency_p99_ms": 1972,
+    "error_rate_pct": 5.59,
+    "throughput_rps": 627,
     "db_connection_utilization": 0.75,
-    "redis_pool_utilization": 0.41,
-    "memory_utilization": 0.74,
-    "queue_depth": 36,
+    "memory_utilization": 0.68,
+    "queue_depth": 21,
     "replicas_restarted_last_1h": 0
   },
   "logs": [
-    "req-69844 WARN  upstream timeout after 2000ms calling cache layer",
-    "req-69844 ERROR checkout.session.cache: no connection available in pool",
-    "req-69844 WARN  retrying cache read (attempt 2/3)",
-    "req-69844 ERROR upstream timeout exceeded threshold"
+    "req-57106 WARN  upstream timeout after 2000ms calling cache layer",
+    "req-57106 ERROR checkout.session.cache: no connection available in pool",
+    "req-57106 WARN  retrying cache read (attempt 2/3)",
+    "req-57106 ERROR upstream timeout exceeded threshold"
   ],
   "recent_deployment": {
     "id": "rel-1016",

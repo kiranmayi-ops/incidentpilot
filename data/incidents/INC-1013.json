@@ -10,20 +10,19 @@
     "latency increased"
   ],
   "metrics": {
-    "latency_p99_ms": 1549,
-    "error_rate_pct": 8.2,
+    "latency_p99_ms": 1687,
+    "error_rate_pct": 4.65,
     "throughput_rps": 926,
     "db_connection_utilization": 0.5,
-    "redis_pool_utilization": 0.39,
-    "memory_utilization": 0.93,
-    "queue_depth": 18,
-    "replicas_restarted_last_1h": 2
+    "memory_utilization": 0.89,
+    "queue_depth": 2,
+    "replicas_restarted_last_1h": 3
   },
   "logs": [
-    "req-61472 ERROR panic: nil pointer dereference in OrderSummary.render",
-    "req-61472 ERROR unhandled TypeError in totals calculation",
-    "req-61472 WARN  500s concentrated on pods from latest rollout",
-    "req-61472 ERROR feature flag default path is throwing"
+    "req-95028 ERROR panic: nil pointer dereference in OrderSummary.render",
+    "req-95028 ERROR unhandled TypeError in totals calculation",
+    "req-95028 WARN  500s concentrated on pods from latest rollout",
+    "req-95028 ERROR feature flag default path is throwing"
   ],
   "recent_deployment": {
     "id": "rel-1012",

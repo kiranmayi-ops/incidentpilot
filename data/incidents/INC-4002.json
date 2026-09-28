@@ -10,20 +10,19 @@
     "5xx increased"
   ],
   "metrics": {
-    "latency_p99_ms": 2058,
-    "error_rate_pct": 8.31,
+    "latency_p99_ms": 1611,
+    "error_rate_pct": 8.08,
     "throughput_rps": 523,
     "db_connection_utilization": 0.75,
-    "redis_pool_utilization": 0.43,
     "memory_utilization": 0.93,
-    "queue_depth": 13,
-    "replicas_restarted_last_1h": 1
+    "queue_depth": 18,
+    "replicas_restarted_last_1h": 3
   },
   "logs": [
-    "req-27848 ERROR panic: nil pointer dereference in OrderSummary.render",
-    "req-27848 ERROR unhandled TypeError in totals calculation",
-    "req-27848 WARN  500s concentrated on pods from latest rollout",
-    "req-27848 ERROR feature flag default path is throwing"
+    "req-89805 ERROR panic: nil pointer dereference in OrderSummary.render",
+    "req-89805 ERROR unhandled TypeError in totals calculation",
+    "req-89805 WARN  500s concentrated on pods from latest rollout",
+    "req-89805 ERROR feature flag default path is throwing"
   ],
   "recent_deployment": {
     "id": "rel-1021",

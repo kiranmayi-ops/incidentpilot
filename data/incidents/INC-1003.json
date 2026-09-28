@@ -10,20 +10,19 @@
     "pod restarts observed"
   ],
   "metrics": {
-    "latency_p99_ms": 1899,
-    "error_rate_pct": 2.56,
+    "latency_p99_ms": 2020,
+    "error_rate_pct": 2.29,
     "throughput_rps": 831,
     "db_connection_utilization": 0.59,
-    "redis_pool_utilization": 0.48,
-    "memory_utilization": 0.95,
-    "queue_depth": 38,
+    "memory_utilization": 0.91,
+    "queue_depth": 47,
     "replicas_restarted_last_1h": 0
   },
   "logs": [
-    "req-69053 WARN  heap usage 93% of limit, GC pressure rising",
-    "req-69053 WARN  long pause 1.8s during mark-sweep",
-    "req-69053 ERROR container OOMKilled risk, rss=3.9Gi",
-    "req-69053 WARN  allocation rate 2.4x baseline"
+    "req-97754 WARN  heap usage 93% of limit, GC pressure rising",
+    "req-97754 WARN  long pause 1.8s during mark-sweep",
+    "req-97754 ERROR container OOMKilled risk, rss=3.9Gi",
+    "req-97754 WARN  allocation rate 2.4x baseline"
   ],
   "recent_deployment": {
     "id": "rel-1002",

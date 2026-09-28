@@ -10,13 +10,12 @@
     "5xx increased"
   ],
   "metrics": {
-    "latency_p99_ms": 1854,
-    "error_rate_pct": 5.43,
+    "latency_p99_ms": 1483,
+    "error_rate_pct": 6.0,
     "throughput_rps": 787,
     "db_connection_utilization": 0.45,
-    "redis_pool_utilization": 0.35,
-    "memory_utilization": 0.91,
-    "queue_depth": 10,
+    "memory_utilization": 0.88,
+    "queue_depth": 55,
     "replicas_restarted_last_1h": 2
   },
   "logs": [

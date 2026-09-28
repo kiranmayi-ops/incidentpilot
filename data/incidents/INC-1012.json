@@ -10,20 +10,19 @@
     "latency increased"
   ],
   "metrics": {
-    "latency_p99_ms": 2510,
-    "error_rate_pct": 1.96,
+    "latency_p99_ms": 2099,
+    "error_rate_pct": 2.34,
     "throughput_rps": 756,
     "db_connection_utilization": 0.55,
-    "redis_pool_utilization": 0.39,
-    "memory_utilization": 0.93,
-    "queue_depth": 43,
+    "memory_utilization": 0.91,
+    "queue_depth": 94,
     "replicas_restarted_last_1h": 0
   },
   "logs": [
-    "req-42286 WARN  heap usage 93% of limit, GC pressure rising",
-    "req-42286 WARN  long pause 1.8s during mark-sweep",
-    "req-42286 ERROR container OOMKilled risk, rss=3.9Gi",
-    "req-42286 WARN  allocation rate 2.4x baseline"
+    "req-67464 WARN  heap usage 93% of limit, GC pressure rising",
+    "req-67464 WARN  long pause 1.8s during mark-sweep",
+    "req-67464 ERROR container OOMKilled risk, rss=3.9Gi",
+    "req-67464 WARN  allocation rate 2.4x baseline"
   ],
   "recent_deployment": {
     "id": "rel-1011",

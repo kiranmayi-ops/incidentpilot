@@ -10,20 +10,19 @@
     "5xx increased"
   ],
   "metrics": {
-    "latency_p99_ms": 1147,
-    "error_rate_pct": 3.73,
+    "latency_p99_ms": 1488,
+    "error_rate_pct": 3.32,
     "throughput_rps": 1022,
     "db_connection_utilization": 0.55,
-    "redis_pool_utilization": 0.48,
-    "memory_utilization": 0.54,
-    "queue_depth": 19925,
+    "memory_utilization": 0.72,
+    "queue_depth": 19540,
     "replicas_restarted_last_1h": 0
   },
   "logs": [
-    "req-59465 WARN  consumer lag 18400 messages on queue-fulfillment",
-    "req-59465 ERROR publish failed, broker unreachable (retrying)",
-    "req-59465 WARN  queue depth 21500 and growing",
-    "req-59465 ERROR message processing deadline exceeded"
+    "req-57406 WARN  consumer lag 18400 messages on queue-fulfillment",
+    "req-57406 ERROR publish failed, broker unreachable (retrying)",
+    "req-57406 WARN  queue depth 21500 and growing",
+    "req-57406 ERROR message processing deadline exceeded"
   ],
   "recent_deployment": {
     "id": "rel-1027",

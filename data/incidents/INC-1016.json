@@ -10,20 +10,19 @@
     "backlog growing"
   ],
   "metrics": {
-    "latency_p99_ms": 1432,
-    "error_rate_pct": 3.08,
+    "latency_p99_ms": 1181,
+    "error_rate_pct": 3.04,
     "throughput_rps": 1430,
     "db_connection_utilization": 0.52,
-    "redis_pool_utilization": 0.38,
-    "memory_utilization": 0.68,
-    "queue_depth": 16713,
+    "memory_utilization": 0.61,
+    "queue_depth": 16534,
     "replicas_restarted_last_1h": 0
   },
   "logs": [
-    "req-43794 WARN  consumer lag 18400 messages on queue-fulfillment",
-    "req-43794 ERROR publish failed, broker unreachable (retrying)",
-    "req-43794 WARN  queue depth 21500 and growing",
-    "req-43794 ERROR message processing deadline exceeded"
+    "req-31710 WARN  consumer lag 18400 messages on queue-fulfillment",
+    "req-31710 ERROR publish failed, broker unreachable (retrying)",
+    "req-31710 WARN  queue depth 21500 and growing",
+    "req-31710 ERROR message processing deadline exceeded"
   ],
   "recent_deployment": {
     "id": "rel-1015",

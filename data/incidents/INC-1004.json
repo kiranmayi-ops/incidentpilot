@@ -10,20 +10,19 @@
     "consumer lag growing"
   ],
   "metrics": {
-    "latency_p99_ms": 1461,
-    "error_rate_pct": 2.38,
+    "latency_p99_ms": 1492,
+    "error_rate_pct": 3.8,
     "throughput_rps": 756,
     "db_connection_utilization": 0.57,
-    "redis_pool_utilization": 0.31,
-    "memory_utilization": 0.68,
-    "queue_depth": 18172,
+    "memory_utilization": 0.53,
+    "queue_depth": 17115,
     "replicas_restarted_last_1h": 0
   },
   "logs": [
-    "req-17958 WARN  consumer lag 18400 messages on queue-fulfillment",
-    "req-17958 ERROR publish failed, broker unreachable (retrying)",
-    "req-17958 WARN  queue depth 21500 and growing",
-    "req-17958 ERROR message processing deadline exceeded"
+    "req-43383 WARN  consumer lag 18400 messages on queue-fulfillment",
+    "req-43383 ERROR publish failed, broker unreachable (retrying)",
+    "req-43383 WARN  queue depth 21500 and growing",
+    "req-43383 ERROR message processing deadline exceeded"
   ],
   "recent_deployment": {
     "id": "rel-1003",
