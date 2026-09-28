@@ -1,184 +1,98 @@
-# Hindsight memory in IncidentPilot
+# Hindsight Memory in IncidentPilot
 
-> Everything marked **VERIFIED** below was read off the installed
-> `hindsight-client` **0.10.1** and, where noted, confirmed against the live
-> Hindsight Cloud API on 2026-09-28. Nothing here is assumed.
+How the agent's long-term memory works, end to end.
 
-## 0. What Hindsight actually is
+## 1. What Hindsight stores
 
-Hindsight is an open-source agent-memory system by Vectorize
-(<https://github.com/vectorize-io/hindsight>, paper arXiv:2512.12818). It is
-**not** the PyPI package named `hindsight` — that one is a Behave-for-Jira test
-client and is a naming trap. The real client is `hindsight-client`.
+Hindsight is a vectorized memory service. IncidentPilot retains an **experience narrative** per incident (built by `backend/app/hindsight/formatting.py` → `build_experience_narrative`):
 
-It exposes three operations over a *memory bank*:
+- the incident id, service, timestamp, severity
+- the symptoms that triggered the investigation
+- the **steps actually taken** (tool, outcome, how useful each turned out to be)
+- the final root cause and resolution
+- any **engineer correction** text
 
-| Operation | Purpose | Uses an LLM? | Returns |
-|---|---|---|---|
-| `retain`  | store content, extracting facts | **yes** (extraction + embedding) | memory ids |
-| `recall`  | multi-strategy search (semantic, keyword, graph, temporal) | no | ranked facts |
-| `reflect` | reason *over* memory | yes | generated answer |
+Retention also sets `metadata` (service, root cause, resolution, step labels) and `tags` (service, root cause, tier) so the memory is addressable and filterable. `document_id = <incident id>` makes every retained episode idempotently addressable and lets us cross-check recall against PostgreSQL.
 
-**VERIFIED** — the exact client surface we depend on:
+## 2. Why PostgreSQL is not the agent's long-term memory
 
-```python
-from hindsight_client import Hindsight            # hindsight-client==0.10.1
-client = Hindsight(base_url=..., api_key=...)     # or HINDSIGHT_API_URL / HINDSIGHT_API_KEY
+PostgreSQL in this project is **application state only** — the incident catalog mirror, the *runs* that an investigation produced, the *tool steps*, the *feedback action*, and demo/eval flags. Two design reasons keep it out of the memory path:
 
-await client.acreate_bank(bank_id, name=, mission=, background=, disposition=)
-await client.aretain(bank_id, content, context=, document_id=, metadata=, tags=)
-await client.arecall(bank_id, query, budget=, max_tokens=, types=, tags=)
-await client.alist_memories(bank_id, limit=, offset=)
-await client.aget_version()
-```
+- **The answer must not leak.** The strategy engine reads only raw telemetry from the deterministic tools. `root_cause`, `successful_steps`, and `lesson` exist in the JSON dataset but are never read by a tool or by the strategy fallback (guarded by tests). Storing strategies-in-runs is fine; storing "the answer recipe" and ranking from it would be hard-coding.
+- **Memory is semantic, not tabular.** Incidents match by *meaning* (symptoms, evidence patterns) across services, and memories must be retrieved by query string. That is exactly what a vector bank provides. Summing an SQL table of past first-steps is a weaker, more brittle prior.
 
-## 1. The four facts that shaped this integration
+## 3. What is retained after an incident
 
-### 1.1 `retain` is not a structured write, and returns no counts
+After an investigation completes and the engineer gives feedback, `POST /incidents/{id}/feedback`:
 
-**VERIFIED** — `RetainResponse` fields are exactly:
+1. persists the run + feedback + (if accepted/corrected) the outcome in PostgreSQL
+2. builds an `ExperienceRecord` from the run, the ground-truth steps for that incident, and the engineer's decision/correction
+3. calls `HindsightMemory.retain_and_wait(...)`
+
+Retention is **async**: Hindsight returns an operation id, and the client polls recall until the incident id is actually recallable (`retain_and_wait`). The UI shows **"memory ready"** only after this probe succeeds — never speculatively. The poll is bounded by `HINDSIGHT_RETAIN_TIMEOUT_SECONDS` (default 180s) and raises `MemoryNotReady` otherwise, so a demo can never silently proceed as if memory existed.
 
 ```
-success, bank_id, items_count, async, operation_id, operation_ids, usage
+[feedback: accept|custom]        [retain returns operation_id]        [probe recall]
+────────────────────────►  ───────────────────────────────►  ─────────────────────────►
+ENGINEER  →  PG run row    →  Hindsight aretain(narrative)  →  recall("...mention INC-3001")
+                 │                    (async ingest)                    │
+                 │                                                    ready?  ──►  "memory ready"
+                 └─────────────────────────────────────────────────────────────┘
 ```
 
-There is **no memory count**. `items_count` is how many *items you submitted*,
-not how many memories were created.
+Repetition is safe: the endpoint is idempotent per `document_id`, and re-seeding is a no-op.
 
-Worse for design purposes: retain runs an LLM that *extracts facts* from your
-text and links them into a knowledge graph. So recall **will not** hand back
-the JSON you retained. If you retain a JSON blob and then recall it, you get
-prose fragments, not your object.
+## 4. How relevant memories are recalled
 
-**What we do about it** — `app/hindsight/formatting.py` renders each experience
-as prose that states, explicitly and in plain language:
+The agent recalls at the start of every investigation (`HindsightMemory.recall`, `budget="mid"` default). The query is an *evidence-framed* question (service + prominent metric signals + recent-deployment hint), not a leaked answer — e.g.:
 
-- `incident_id` and `service`
-- the **ordered investigation path** (`check_database -> check_redis -> ...`)
-- `root_cause` and `resolution`
-- which steps were low-value and which were useful
-- the engineer's correction
-- the lesson
+> "An incident like this before: which layer was implicated first — database, redis, or a recent deployment?"
 
-and *then* appends a structured JSON copy as a second layer. Recall usually
-surfaces the prose; the JSON is there if the chunk is ever returned whole.
-Incident ids are also written to `document_id`, `metadata` and `tags`.
+Recall returns ranked snippets plus their incident ids (`RecallOutcome.incident_ids`). Every id is then **validated against the actual catalog** (`records.get(cid)`); if an id is not a known incident it is dropped, and any strategy step that cites an unknown id is rejected (`validate_evidence_ids` + `constrain_to_allowlist`). Raw outcome (query, count, incident ids) is returned by `GET /incidents/{id}/memory` and shown in the UI memory panel.
 
-### 1.2 Retention is asynchronous
+## 5. How recalled memories affect strategy generation
 
-**VERIFIED** — Hindsight's own integration guide tells you to
-`await asyncio.sleep(3)` when retain and recall happen back to back, and
-`retain(..., retain_async=)` plus `operation_id` exist for this reason.
-
-So `retain()` returning does **not** mean the memory exists yet. A naive
-`retain(); recall()` can legitimately return nothing — and a demo that then
-concludes "memory didn't change the strategy" would be wrong.
-
-**What we do about it** — `HindsightMemory.retain_and_wait()` polls `recall`
-until the retained `incident_id` is actually present, bounded by
-`HINDSIGHT_RETAIN_TIMEOUT_SECONDS`. If it never becomes recallable it raises
-`MemoryNotReady` and the run stops. The UI only shows **memory ready** when
-that poll succeeded. The smoke script exercises exactly this.
-
-### 1.3 Recall returns results, not a total
-
-**VERIFIED** — `RecallResponse` has `results`, `trace`, `entities`, `chunks`,
-`source_facts`. There is **no `total`**.
-
-Therefore every count in the UI is `len(results)` plus computation over
-structured records — never a number somebody typed. See §3.
-
-### 1.4 `RecallResult` is the join surface
-
-**VERIFIED** — each result carries:
+`generate_strategy` (backend/app/agent/strategy.py) composes three inputs:
 
 ```
-id, text, type, entities, context, occurred_start, occurred_end,
-mentioned_at, document_id, metadata, chunk_id, tags, source_fact_ids,
-scores, attachments
+CURRENT INCIDENT EVIDENCE   +   RECALLED HINDSIGHT EXPERIENCES   +   LLM RANKING
+(render_current_evidence)       (render_recalled_memory)              (temperature 0,
+                                 structural JSON, ecosystem IDs validated)
+────────────────────────────────────────────► ORDERED STRATEGY (check_* steps)
 ```
 
-`text` is authoritative (extraction may drop the rest), so we parse incident
-ids out of it with a strict `\bINC-\d{3,6}\b` pattern and use `metadata` /
-`document_id` only as corroboration.
+The LLM sees both the current evidence and the recalled episodes by id, and produces a JSON plan that is Pydantic-validated. Because recall is one input among several, memory shifts the ordering *without* owning it.
 
-## 2. Where Hindsight is used, and where it is not
+If the LLM is unavailable (or fails twice), a **memory-driven fallback** ranks the same five tools purely from:
+
+- historical prior — how often each tool was `successful` vs `failed` across the *actual* recalled incident ids (diminishing returns: `0.7·log2(1+n)`, capped)
+- current-evidence bonuses — e.g. `db_connection_utilization ≥ 0.90 → +1.3 check_database`
+
+The fallback is **not** a per-service table; swap the seeded history and the ordering changes (there is a regression test for exactly that).
+
+## 6. How engineer feedback becomes memory
+
+- **accept**: retained with the engineer's confirmation of the outcome.
+- **reject**: retained with the successful-steps emptied (nothing useful remembered) so the prior cannot be boosted.
+- **custom correction**: retained with an explicit `engineer_correction` text; the corrected steps become the episode's successful steps. This is the Tier-2 replay mechanism: `POST /demo/replay` re-runs three checkout-api incidents with scripted corrections like *"For checkout-api latency with 5xx, check Redis earlier."* and retains each for real. Hindsight then has experiences whose content literally encodes the correction.
+
+## 7. How new incidents update the memory
+
+Every accepted/corrected incident is itself retained (`document_id = incident id`). The next recall for that service therefore includes the newest episode alongside older ones; retention is append-only, and the bank accumulates the agent's (and engineers') own history. The Learning Evolution page reads PostgreSQL runs grouped by episode *and* live recall to show paths labelled by source: `seed_tier1`, `replay`/"scripted feedback", `demo`, `eval`.
+
+## 8. How stale historical knowledge is handled
+
+Historical priors are **saturating and capped** (`min(1.2, 0.7·log2(1+n))`, waste penalized `min(0.9, 0.35·log2(1+n))`), so a pattern is a strong-but-bounded prior, never a verdict — enough duplicated history can accumulate but not dominate future plans.
+
+The active guard is the **contradiction gate**: if the *current* incident's evidence strongly implicates layer X (`≥ 0.7` live bonus) but a historical prior points at layer Y, the prior for Y is zeroed with the logged reason *"current evidence implicates a different layer, so this historical prior was set aside."* This is what makes the counter-case work: checkout-api with a healthy Redis and a saturated database does **not** start with `check_redis` even after the Redis lesson was retained — the current evidence outranks the memory.
 
 ```
-PostgreSQL  ── application state ──► incidents, investigation_runs,
-                                    investigation_steps, feedback,
-                                    evaluation results, demo state
-
-Hindsight   ── long-term memory  ──► investigation experiences, engineer
-                                    corrections, lessons, recurring patterns
+                        recalled: "checkout → check_redis"        current: db_util 0.96
+        ┌──────────────────────────────────────┐        ┌───────────────────────────┐
+        │ hist[check_redis] = +1.2 (from replays)│        │ live[check_database]=+1.3  │
+        └──────────────────────────────────────┘        └───────────────────────────┘
+                          │                                          │
+                          ▼                                          ▼
+                        contradiction gate detects mismatch → zeroes stale prior
+                          └────────────────►  strategy ranks check_database first
 ```
-
-PostgreSQL is **never** used as a stand-in for memory and never decides a
-strategy. It is used for exactly one thing in the memory path: **counting and
-annotating incidents that Hindsight's recall actually returned.** If recall
-returns nothing, the counts are zero — the database does not backfill them.
-
-## 3. Every number in the UI is computed
-
-`compute_recall_stats()` produces the "N similar experiences / M engineer
-confirmations / K low-yield steps" line:
-
-| Number | Source |
-|---|---|
-| `recalled_count` | `len(RecallResponse.results)` |
-| `incident_ids` | ids parsed from recall `text`/`metadata`/`document_id` |
-| `engineer_confirmations` | recalled incidents that carry a correction |
-| `low_yield_steps` | ruled-out steps across those same recalled incidents |
-| `*_step_counts` | per-tool tallies over those same recalled incidents |
-
-The incident ids that were counted are returned alongside the counts so a
-judge can see the derivation.
-
-## 4. Memory as guidance, not proof
-
-The bank mission instructs Hindsight to prefer experiences that are relevant,
-recent, repeatedly confirmed and backed by successful outcomes — and explicitly
-to treat history as something to validate against current evidence, not as
-proof.
-
-This matters for the counter-case (`INC-4002`): a `checkout-api` incident with
-*identical* symptoms where Redis is **healthy** and a bad deploy is the cause.
-The agent recalls the Redis lesson and must still decline to lead with Redis.
-Strategy validation lives in `app/agent/strategy.py`, which also **rejects any
-`historical_evidence` id that is not in the current recall result**, so the
-model cannot cite a memory it did not get.
-
-## 5. Deployment
-
-- **Hindsight Cloud** (default, recommended) — no Docker, free tier. Set
-  `HINDSIGHT_API_URL=https://api.hindsight.vectorize.io` and
-  `HINDSIGHT_API_KEY`.
-- **Self-hosted** — `pip install hindsight-all` then `hindsight-api` on
-  `:8888`. **VERIFIED** it needs PostgreSQL with `pgvector` (deps: `asyncpg`,
-  `pgvector`, `psycopg2-binary`); there is an `embedded-db` extra
-  (`pg0-embedded`) for Docker-free local use, plus a `local-llm` extra
-  (`llama-cpp-python`). It also needs its own LLM key
-  (`HINDSIGHT_API_LLM_API_KEY`) to extract facts on retain.
-
-## 6. Operational notes found in practice
-
-- **TLS on macOS/CPython**: `hindsight-client` is aiohttp-based. With no system
-  CA bundle for the active interpreter it fails with
-  `CERTIFICATE_VERIFY_FAILED` and a healthy API looks dead. We set
-  `SSL_CERT_FILE` to certifi's bundle **before importing `hindsight_client`**,
-  because aiohttp builds its default SSL context at import time. This was
-  found by running the smoke test, not by assumption.
-- **`/health` must fail loudly.** `HindsightMemory.health()` performs a real
-  `aget_version()`. An unreachable bank reports `reachable: false` and the app
-  never silently pretends memory is working.
-
-## 7. Reproducing the verification
-
-```bash
-cp .env.example .env      # add HINDSIGHT_API_KEY
-.venv/bin/python scripts/hindsight_smoke.py
-```
-
-It creates the bank, retains one real experience, blocks until recallable,
-recalls, and prints the **raw** results (ids, types, tags, metadata, text) so
-the behaviour above can be inspected directly.
