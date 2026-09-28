@@ -113,6 +113,9 @@ class InvestigationRun(Base):
     outcome_resolved: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     root_cause_candidate: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Set to the real timestamp when the experience was successfully retained in
+    # Hindsight. Guard against double-retains from feedback + resolve.
+    retained_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

@@ -61,9 +61,19 @@ async def dispose_engine() -> None:
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
-    """FastAPI dependency: one session per request, closed afterwards."""
+    """FastAPI dependency: one session per request, closed afterwards.
+
+    Commits on success so agent writes (runs, steps, feedback) survive past
+    the request, and rolls back on error so a failed endpoint never persists
+    a partial investigation.
+    """
     async with get_sessionmaker()() as session:
-        yield session
+        try:
+            yield session
+            await session.commit()
+        except BaseException:
+            await session.rollback()
+            raise
 
 
 async def init_models(settings: Settings | None = None) -> None:

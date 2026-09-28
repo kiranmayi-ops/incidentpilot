@@ -100,6 +100,11 @@ class LLMClient:
     def last_call_from_cache(self) -> bool | None:
         return self._last_call_from_cache
 
+    @property
+    def model(self) -> str | None:
+        """Configured model name (used to label runs honestly)."""
+        return self._settings.llm_model
+
     # -- cache ------------------------------------------------------------
 
     def _cache_path(self, key: str) -> Path:

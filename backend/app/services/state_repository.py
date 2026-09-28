@@ -196,6 +196,31 @@ class StateRepository:
             or 0
         )
 
+    async def completed_runs_with_steps(
+        self, *, limit: int = 200
+    ) -> list[tuple[InvestigationRun, list[InvestigationStep]]]:
+        """Completed runs (oldest first) each with their executed steps.
+
+        Powers the /learning endpoints. Everything the UI shows about strategy
+        evolution is derived from REAL rows: the order the agent actually
+        planned/executed per run, engineer feedback, and low-yield steps.
+        """
+        runs = list(
+            (
+                await self._session.scalars(
+                    select(InvestigationRun)
+                    .where(InvestigationRun.status == "completed")
+                    .order_by(InvestigationRun.created_at.asc())
+                )
+            ).all()
+        )
+        runs = runs[-limit:]
+        pairs: list[tuple[InvestigationRun, list[InvestigationStep]]] = []
+        for run in runs:
+            steps = await self.list_steps(run.id)
+            pairs.append((run, steps))
+        return pairs
+
     # -------------------------------------------------------------- timeline
     async def timeline(self, run_id: int) -> tuple[InvestigationRun | None, list[InvestigationStep]]:
         """(run, ordered steps) — everything the UI timeline needs."""
