@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     postgres_host: str = "localhost"
     postgres_port: int = 5432
     database_url: str | None = None
+    # Create tables on startup (dev/demo convenience; uses SQLAlchemy
+    # metadata.create_all). Production can leave this off and rely on alembic.
+    db_auto_create_tables: bool = True
+    # Mirror the synthetic incident catalog into PostgreSQL on startup when the
+    # incidents table is empty. The JSON dataset remains the source of truth for
+    # telemetry; PG is app state only and never decides a strategy.
+    db_auto_seed: bool = True
 
     # --- hindsight (the agent's long-term memory) --------------------------
     hindsight_api_url: str = "https://api.hindsight.vectorize.io"

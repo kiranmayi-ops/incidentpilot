@@ -1,0 +1,55 @@
+# IncidentPilot demo stack: FastAPI app + PostgreSQL (application state).
+#
+# PostgreSQL holds application state only. The agent's long-term memory is
+# Hindsight (cloud or self-hosted); it is NOT in this compose file.
+#
+# Usage:
+#   cp .env.example .env   # fill in HINDSIGHT_API_KEY / LLM_API_KEY
+#   docker compose up --build
+#   open http://localhost:8000/docs
+#
+# Note: `docker compose build` must run with a working Docker daemon. The
+# container image is NOT verifiable on machines without Docker.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-incidentpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-incidentpilot}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-incidentpilot} -d ${POSTGRES_DB:-incidentpilot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      # Point the app at the compose Postgres service.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-incidentpilot}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-incidentpilot}
+      DB_AUTO_CREATE_TABLES: "true"
+      DB_AUTO_SEED: "true"
+      HINDSIGHT_API_URL: ${HINDSIGHT_API_URL:-https://api.hindsight.vectorize.io}
+      HINDSIGHT_API_KEY: ${HINDSIGHT_API_KEY:-}
+      HINDSIGHT_BANK_ID: ${HINDSIGHT_BANK_ID:-engineering-prod}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.openai.com/v1}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-2048}
+      LLM_REASONING_EFFORT: ${LLM_REASONING_EFFORT:-low}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+volumes:
+  dbdata:
