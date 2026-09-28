@@ -1,0 +1,107 @@
+{
+ "incident_id": "INC-4014",
+ "tier": "eval",
+ "timestamp": "2026-08-20T09:30:00Z",
+ "service": "user-service",
+ "environment": "production",
+ "severity": "SEV-1",
+ "symptoms": [
+  "user-service latency increased",
+  "5xx increased"
+ ],
+ "metrics": {
+  "latency_p99_ms": 1590,
+  "error_rate_pct": 3.1,
+  "throughput_rps": 600,
+  "db_connection_utilization": 0.48,
+  "memory_utilization": 0.62,
+  "queue_depth": 40,
+  "replicas_restarted_last_1h": 0
+ },
+ "logs": [
+  "req-6650 ERROR 401s and 500s after profile rollout",
+  "req-6650 ERROR feature flag rollout inverted",
+  "req-6650 WARN  canary percentage for new profile renderer"
+ ],
+ "recent_deployment": {
+  "id": "rel-10",
+  "age_minutes": 340,
+  "author": "platform-team",
+  "summary": "dependency bump + config change"
+ },
+ "initial_hypotheses": [
+  "dependency saturation",
+  "recent regression",
+  "capacity exhaustion",
+  "configuration change"
+ ],
+ "investigation_steps": [
+  {
+   "order": 1,
+   "action": "check_recent_deployments",
+   "result": "anomaly_detected",
+   "useful": true
+  },
+  {
+   "order": 2,
+   "action": "check_database",
+   "result": "healthy",
+   "useful": false
+  },
+  {
+   "order": 3,
+   "action": "check_redis",
+   "result": "healthy",
+   "useful": false
+  }
+ ],
+ "root_cause": "bad_deployment",
+ "resolution": "scale_db_connection_pool",
+ "failed_steps": [
+  "check_database",
+  "check_redis"
+ ],
+ "successful_steps": [
+  "check_recent_deployments"
+ ],
+ "engineer_correction": null,
+ "time_to_resolution": 18,
+ "lesson": "The profile renderer rollout inverted a flag; database and cache remained healthy.",
+ "service_dependencies": [],
+ "infra_dependencies": [
+  "external-psp",
+  "postgres-orders",
+  "redis-sessions"
+ ],
+ "telemetry": {
+  "check_database": {
+   "status": "healthy",
+   "evidence": {
+    "connection_utilization": 0.48,
+    "active_connections": 57,
+    "lock_waits_per_min": 2,
+    "replication_lag_s": 0,
+    "slow_queries_over_1s": 2
+   }
+  },
+  "check_redis": {
+   "status": "healthy",
+   "evidence": {
+    "connection_pool_utilization": 0.44,
+    "timeouts_last_5m": 0,
+    "avg_latency_ms": 2,
+    "evicted_keys_last_5m": 4,
+    "connected_clients": 60
+   }
+  },
+  "check_recent_deployments": {
+   "status": "degraded",
+   "evidence": {
+    "deploys_last_24h": 2,
+    "last_deploy_age_minutes": 14,
+    "error_rate_delta_pct": 2.1,
+    "rollback_candidate": "rel-1310"
+   }
+  }
+ }
+}
