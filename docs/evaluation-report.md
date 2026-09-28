@@ -29,8 +29,18 @@ Measured during the Phase-7 demo rehearsal on a throwaway bank (`engineering-pro
 - **Learning evolution / strategy** after seed+replay — computed from PostgreSQL runs + live recall:
   - first-choice counts: `check_redis` **2×**, `check_recent_deployments` **2×**, others 0
   - engineer confirmations: `check_redis` **2×**
-- **Baseline-vs-memory (demo incident):** live baseline first step for `INC-2001` observed as `check_recent_deployments` (≠ `check_redis`); the memory run started with `check_redis`. These are legitimately different run-to-run (real LLM reasoning), but the direction — memory explicitly citing the replayed checkout incidents and choosing Redis first — reproduces reliably across the deterministic harness and the live runs.
-- Retention readiness was probed until recall succeeded before the UI reported "memory ready" (async ingest, polling).
+
+A final clean-log live run on the fully seeded bank (real LLM `openai/gpt-oss-20b`, temperature 0, no fallback) produced:
+
+| Run | First step | fallback | Recall | Cited ids |
+| --- | --- | --- | --- | --- |
+| Baseline `INC-2001` (recall disabled) | `check_recent_deployments` | no | 0 | — |
+| Memory `INC-2001` | `check_redis` | no | 119 results | `INC-3002, INC-3003` (replayed episodes) |
+| Counter-case `INC-4010` (memory on) | `check_database` | no | 119 results | `INC-1009, INC-1002` (db-correct payment) |
+
+The memory run's first step changed because the replayed checkout episodes were recalled **and the LLM could not justify not naming them**; the counter-case run *also recalled* the checkout→Redis lesson but ranked `check_database` first because the current evidence (97% DB connection utilization, pool saturation logs) contradicted it. A Groq daily-token limit independently exercised the reliability path during rehearsal: the LLM was retried then **explicitly** fell back to the memory-ranked fallback, which the API marked `fallback=True` and surfaced in the UI.
+
+Retention readiness was probed until recall succeeded before the UI reported "memory ready" (async ingest, polling).
 
 ## What a larger eval would measure (not yet run)
 
