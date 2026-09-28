@@ -354,3 +354,53 @@ async def reset_demo_bank(
     report = await fresh.ensure_bank()
     logger.info("demo bank created bank_id=%s status=%s", fresh_id, report.get("status"))
     return fresh, {"bank_id": fresh_id, "status": report.get("status"), "phase": "baseline"}
+
+
+async def replay_tier2(
+    agent: InvestigationAgent,
+    repo: StateRepository,
+    *,
+    incident_ids: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Replay the scripted checkout history through the REAL pipeline (spec §19
+    Tier 2). Each incident is investigated with recall enabled and then closed
+    with its scripted engineer correction, so it produces real PostgreSQL rows
+    and a real Hindsight retention. Never fabricated: if recall, LLM strategy
+    or retention fails, the failure is reported per incident.
+    """
+    targets = [inc for inc in agent.records().values() if inc.tier == "replay"]
+    if incident_ids:
+        wanted = set(incident_ids)
+        targets = [inc for inc in targets if inc.incident_id in wanted]
+
+    results: list[dict[str, Any]] = []
+    for inc in targets:
+        try:
+            run = await agent.investigate(repo, inc.incident_id, kind="replay")
+            scripted = inc.engineer_correction
+            kind = "correct" if scripted else "accept"
+            out = await agent.apply_feedback(repo, run.id, kind=kind, text=scripted)
+            results.append(
+                {
+                    "incident_id": inc.incident_id,
+                    "run_id": run.id,
+                    "scripted_feedback": kind == "correct",
+                    "feedback_text": scripted,
+                    "retained": bool(out.get("retained")),
+                    "first_step": run.strategy[0]["step"] if run.strategy else None,
+                    "reason": out.get("reason"),
+                }
+            )
+        except Exception as exc:  # keep going; report every failure honestly
+            results.append(
+                {
+                    "incident_id": inc.incident_id,
+                    "run_id": None,
+                    "scripted_feedback": False,
+                    "feedback_text": None,
+                    "retained": False,
+                    "first_step": None,
+                    "reason": f"{type(exc).__name__}: {exc}",
+                }
+            )
+    return results

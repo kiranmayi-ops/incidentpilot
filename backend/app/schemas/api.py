@@ -191,6 +191,23 @@ class DemoSeedResponse(BaseModel):
     failures: list[str]
 
 
+class ReplayRecord(BaseModel):
+    incident_id: str
+    run_id: int | None
+    scripted_feedback: bool = False
+    feedback_text: str | None = None
+    retained: bool = False
+    first_step: str | None = None
+    reason: str | None = None
+
+
+class ReplayResponse(BaseModel):
+    tier: str = "replay"
+    scripted_feedback: bool = True
+    replayed: list[ReplayRecord]
+    failures: list[str]
+
+
 class LearningEvolutionItem(BaseModel):
     incident_id: str
     kind: str

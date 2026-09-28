@@ -100,6 +100,6 @@ export function learnedOverview(strategy: LearningStrategy, evolutionItems: numb
 export function pathToStepsLabel(kind: string): string {
   if (kind === "baseline") return "baseline plan";
   if (kind === "live") return "live plan";
-  if (kind === "replay") return "scripted replay";
+  if (kind === "replay") return "scripted feedback";
   return "memory plan";
 }

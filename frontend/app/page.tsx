@@ -21,6 +21,8 @@ export default function DashboardPage() {
   const [strategy, setStrategy] = useState<LearningStrategy | null>(null);
   const [evolution, setEvolution] = useState<LearningEvolutionItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [demoBusy, setDemoBusy] = useState<string | null>(null);
+  const [demoMsg, setDemoMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -43,6 +45,41 @@ export default function DashboardPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function demoAction(kind: "reset" | "seed" | "replay") {
+    setDemoBusy(kind);
+    setDemoMsg(null);
+    setError(null);
+    try {
+      if (kind === "reset") {
+        const out = await EngineAPI.demoReset();
+        setHealth(await EngineAPI.health());
+        setDemoMsg(
+          `Fresh demo memory bank "${out.bank_id}" (phase ${out.phase}). Run tier-1 seed + replay to rebuild the story.`,
+        );
+      } else if (kind === "seed") {
+        const out = await EngineAPI.demoSeed();
+        const failed = out.failures.length ? `; failures: ${out.failures.join(", ")}` : "";
+        setDemoMsg(`Seeded ${out.seeded.length} tier-1 experiences into Hindsight.${failed}`);
+      } else {
+        const out = await EngineAPI.demoReplay();
+        const ok = out.replayed.filter((r) => r.retained);
+        const failed = out.failures.length ? `; failures: ${out.failures.join(", ")}` : "";
+        setDemoMsg(
+          `Replayed ${ok.length}/3 scripted checkout incidents through the real pipeline (recall → strategy → investigate → scripted feedback → retain).${failed}`,
+        );
+      }
+      // learning surfaces immediately after replay/seed feedback runs complete
+      const evo = await EngineAPI.learningEvolution();
+      setEvolution(evo.items);
+      const strat = await EngineAPI.learningStrategy();
+      setStrategy(strat);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDemoBusy(null);
+    }
+  }
 
   if (error && !incidents) return <ErrorBox message={`Backend unreachable: ${error}`} />;
   if (!incidents || !health || !evolution) return <Spinner />;
@@ -123,6 +160,27 @@ export default function DashboardPage() {
           )}
         </Section>
       </div>
+
+      <Section title="Demo controls">
+          <div className="row" style={{ alignItems: "center" }}>
+            <button className="btn ghost" disabled={demoBusy !== null} onClick={() => void demoAction("reset")}>
+              {demoBusy === "reset" ? "Resetting…" : "Reset memory bank"}
+            </button>
+            <button className="btn ghost" disabled={demoBusy !== null} onClick={() => void demoAction("seed")}>
+              {demoBusy === "seed" ? "Seeding…" : "Seed tier-1 knowledge"}
+            </button>
+            <button className="btn" disabled={demoBusy !== null} onClick={() => void demoAction("replay")}>
+              {demoBusy === "replay" ? "Replaying…" : "Replay scripted history"}
+            </button>
+            {health.demo_mode ? <span className="badge tier_demo">demo mode</span> : null}
+          </div>
+          {demoMsg ? <div className="ok-box" style={{ marginTop: 10 }}>{demoMsg}</div> : null}
+          <div className="muted small" style={{ marginTop: 10 }}>
+            Tier-1: general knowledge + distractors (no checkout Redis history). Replay: 3
+            scripted checkout incidents through the real pipeline — labelled scripted
+            feedback, retained to Hindsight for real.
+          </div>
+        </Section>
 
       <Section title="Services">
         <table className="data">

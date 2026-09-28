@@ -225,6 +225,23 @@ export interface DemoSeed {
   failures: string[];
 }
 
+export interface ReplayRecord {
+  incident_id: string;
+  run_id: number | null;
+  scripted_feedback: boolean;
+  feedback_text: string | null;
+  retained: boolean;
+  first_step: string | null;
+  reason: string | null;
+}
+
+export interface DemoReplay {
+  tier: string;
+  scripted_feedback: boolean;
+  replayed: ReplayRecord[];
+  failures: string[];
+}
+
 // ----------------------------------------------------------------- calls
 
 export const EngineAPI = {
@@ -261,4 +278,10 @@ export const EngineAPI = {
     }),
   learningStrategy: () => request<LearningStrategy>("/learning/strategy"),
   learningEvolution: () => request<LearningEvolution>("/learning/evolution"),
+  demoReset: () =>
+    request<DemoReset>("/demo/reset", { method: "POST", body: JSON.stringify({}) }),
+  demoSeed: () =>
+    request<DemoSeed>("/demo/seed", { method: "POST", body: JSON.stringify({}) }),
+  demoReplay: () =>
+    request<DemoReplay>("/demo/replay", { method: "POST", body: JSON.stringify({}) }),
 };

@@ -223,3 +223,26 @@ async def test_demo_seed_retains_tier1(api):
     assert body["failures"] == []
     assert len(memory.retained) == 16
     assert all(rec.script_kind == "seed_tier1" for rec in memory.retained)
+
+
+async def test_demo_replay_scripted_feedback_through_real_pipeline(api):
+    client, memory, _ = api
+    resp = await client.post("/demo/replay")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert {r["incident_id"] for r in body["replayed"]} == {"INC-3001", "INC-3002", "INC-3003"}
+    assert body["scripted_feedback"] is True
+    assert body["failures"] == []
+    for rec in body["replayed"]:
+        assert rec["run_id"] is not None
+        assert rec["retained"] is True
+        assert rec["scripted_feedback"] is True
+        assert rec["feedback_text"]
+    assert len(memory.retained) == 3
+    assert all(rec.script_kind == "scripted_feedback" for rec in memory.retained)
+
+    # replay produced real PostgreSQL rows that feed learning
+    evo = (await client.get("/learning/evolution")).json()
+    replay_items = [it for it in evo["items"] if it["kind"] == "replay"]
+    assert len(replay_items) == 3
+    assert all(it["retained"] and it["feedback_kind"] == "correct" for it in replay_items)

@@ -2,6 +2,7 @@
 
 POST /demo/reset    — fresh Hindsight bank per demo run (spec §19), resets PG
 POST /demo/seed     — retain Tier-1 operational knowledge into the demo bank
+POST /demo/replay   — replay scripted checkout history through the REAL pipeline
 GET  /learning/strategy   — current learned strategy, computed from real rows
 GET  /learning/evolution  — investigation paths from real rows
 """
@@ -19,8 +20,15 @@ from app.schemas.api import (
     LearningEvolutionItem,
     LearningEvolutionResponse,
     LearningStrategyResponse,
+    ReplayRecord,
+    ReplayResponse,
 )
-from app.services.investigation import reset_demo_bank, seed_tier1_bank
+from app.services.investigation import (
+    InvestigationAgent,
+    replay_tier2,
+    reset_demo_bank,
+    seed_tier1_bank,
+)
 from app.services.learning import derive_learning, evolution_items
 from app.services.state_repository import StateRepository
 
@@ -29,6 +37,10 @@ router = APIRouter()
 
 async def _repo(session: AsyncSession = Depends(app_db.get_session)) -> StateRepository:
     return StateRepository(session)
+
+
+def _agent(request: Request) -> InvestigationAgent:
+    return InvestigationAgent(memory=request.app.state.memory)
 
 
 @router.post("/demo/reset", response_model=DemoResetResponse)
@@ -59,6 +71,23 @@ async def demo_seed(request: Request) -> DemoSeedResponse:
     settings = get_settings()
     out = await seed_tier1_bank(request.app.state.memory, settings=settings)
     return DemoSeedResponse(tier=out["tier"], seeded=out["seeded"], failures=out["failures"])
+
+
+@router.post("/demo/replay", response_model=ReplayResponse)
+async def demo_replay(request: Request, repo: StateRepository = Depends(_repo)) -> ReplayResponse:
+    """Replay the scripted checkout history through the real pipeline (spec §19
+    Tier 2). Produces real investigate->feedback->retain rows + Hindsight
+    retentions; runs are labelled as scripted feedback.
+    """
+    try:
+        records = await replay_tier2(_agent(request), repo)
+    except Exception as exc:  # honest failure surface for a demo-critical endpoint
+        raise HTTPException(status_code=503, detail=f"replay failed: {exc}") from exc
+    failures = [r["reason"] or f"run {r['run_id']} not retained" for r in records if not r["retained"]]
+    return ReplayResponse(
+        replayed=[ReplayRecord(**r) for r in records],
+        failures=failures,
+    )
 
 
 @router.get("/learning/strategy", response_model=LearningStrategyResponse)

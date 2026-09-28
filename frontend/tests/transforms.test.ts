@@ -117,6 +117,6 @@ describe("pathToStepsLabel", () => {
     expect(pathToStepsLabel("baseline")).toBe("baseline plan");
     expect(pathToStepsLabel("memory")).toBe("memory plan");
     expect(pathToStepsLabel("live")).toBe("live plan");
-    expect(pathToStepsLabel("replay")).toBe("scripted replay");
+    expect(pathToStepsLabel("replay")).toBe("scripted feedback");
   });
 });
