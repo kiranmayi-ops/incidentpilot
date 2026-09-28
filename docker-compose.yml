@@ -1,4 +1,5 @@
-# IncidentPilot demo stack: FastAPI app + PostgreSQL (application state).
+# IncidentPilot demo stack: FastAPI app + PostgreSQL (application state) +
+# Next.js frontend.
 #
 # PostgreSQL holds application state only. The agent's long-term memory is
 # Hindsight (cloud or self-hosted); it is NOT in this compose file.
@@ -6,7 +7,7 @@
 # Usage:
 #   cp .env.example .env   # fill in HINDSIGHT_API_KEY / LLM_API_KEY
 #   docker compose up --build
-#   open http://localhost:8000/docs
+#   open http://localhost:3000   (frontend)   /  http://localhost:8000/docs
 #
 # Note: `docker compose build` must run with a working Docker daemon. The
 # container image is NOT verifiable on machines without Docker.
@@ -50,6 +51,16 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
+
+  frontend:
+    build:
+      context: frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
 
 volumes:
   dbdata:
