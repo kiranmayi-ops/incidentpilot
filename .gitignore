@@ -43,3 +43,7 @@ logs/
 .idea/
 .vscode/
 *.swp
+
+# --- local tooling scratch ---
+.freebuff/
+.playwright-mcp/

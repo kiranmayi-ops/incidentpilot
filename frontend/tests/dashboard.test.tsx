@@ -1,12 +1,35 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import DashboardPage from "@/app/page";
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/console",
+  useParams: () => ({ id: "INC-2001" }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    children,
+    ...props
+  }: {
+    href: string;
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
+import OverviewPage from "@/app/console/page";
 
 const incidents = [
   {
     incident_id: "INC-2001",
     tier: "demo",
-    timestamp: "session",
+    timestamp: "2026-01-01T00:00:00Z",
     service: "checkout-api",
     environment: "prod",
     severity: "SEV1",
@@ -23,7 +46,13 @@ const incidents = [
 const incBody = (url: string | URL | Request) => {
   const p = String(url);
   if (p.endsWith("/health")) {
-    return { status: "ok", database: {}, hindsight: { status: "ok" }, demo_mode: false, version: "0.1.0" };
+    return {
+      status: "ok",
+      database: { status: "ok" },
+      hindsight: { status: "ok" },
+      demo_mode: false,
+      version: "0.1.0",
+    };
   }
   if (p.endsWith("/incidents")) return { total: 1, items: incidents };
   if (p.endsWith("/learning/strategy")) {
@@ -74,36 +103,33 @@ beforeEach(() => {
   );
 });
 
-describe("DashboardPage", () => {
+describe("Console overview", () => {
   it("renders counts derived from the mocked API responses", async () => {
-    render(<DashboardPage />);
+    render(<OverviewPage />);
 
-    expect(
-      await screen.findByRole("heading", { name: /Incident command deck/ }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Overview", level: 1 })).toBeInTheDocument();
 
-    // dashboard stat cards derived from the incident list (one incident -> total 1)
-    expect((await screen.findAllByText("Incidents")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("1").length).toBeGreaterThan(0);
-    expect(await screen.findByText("Active (unresolved)")).toBeInTheDocument();
-    expect((await screen.findAllByText("Resolved")).length).toBeGreaterThan(0);
+    // One incident in the catalog -> "Incidents tracked" is 1 and the queue shows it.
+    expect(await screen.findByText("Incidents tracked")).toBeInTheDocument();
+    expect(screen.getByText("Active now")).toBeInTheDocument();
+    expect(await screen.findAllByText("1")).not.toHaveLength(0);
 
-    // learned pattern row derived from /learning/strategy
-    expect((await screen.findAllByText("check_redis")).length).toBeGreaterThan(0);
+    // The learned first check comes from /learning/strategy, not a constant.
+    expect(await screen.findAllByText("check_redis")).not.toHaveLength(0);
+    expect(await screen.findByText("What the agent learned")).toBeInTheDocument();
 
-    // checkout-api service row derived from the incident list
-    expect(await screen.findByRole("heading", { name: "Services" })).toBeInTheDocument();
+    // The service rollup is derived from the incident list.
+    expect(await screen.findByText("Services and their learned opening move")).toBeInTheDocument();
+    expect((await screen.findAllByText("checkout-api")).length).toBeGreaterThan(0);
   });
 
-  it("shows a real Hindsight status from /health", async () => {
-    render(<DashboardPage />);
-    await screen.findByRole("heading", { name: /Incident command deck/ });
-    const oks = await screen.findAllByText("ok");
-    expect(oks.length).toBeGreaterThan(0);
-    expect((await screen.findAllByText("Hindsight")).length).toBeGreaterThan(0);
+  it("shows the real memory status from /health", async () => {
+    render(<OverviewPage />);
+    expect(await screen.findByText("All systems nominal")).toBeInTheDocument();
+    expect(screen.queryByText(/Engine unreachable/)).not.toBeInTheDocument();
   });
 
-  it("renders when health reports a reachable but degraded backend", async () => {
+  it("stays useful when health reports a reachable but degraded backend", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn((url: string | URL | Request) =>
@@ -129,12 +155,10 @@ describe("DashboardPage", () => {
       ),
     );
 
-    render(<DashboardPage />);
+    render(<OverviewPage />);
 
-    expect(
-      await screen.findByRole("heading", { name: /Incident command deck/ }),
-    ).toBeInTheDocument();
-    expect((await screen.findAllByText("unconfigured")).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/Backend unreachable/)).not.toBeInTheDocument();
+    expect(await screen.findByText("Running degraded")).toBeInTheDocument();
+    // A degraded engine is surfaced, not silently swallowed.
+    expect(await screen.findByText("Engine is running degraded")).toBeInTheDocument();
   });
 });

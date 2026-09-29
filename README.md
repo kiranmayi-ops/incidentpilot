@@ -8,12 +8,27 @@ Incident response is often procedural guesswork: engineers re-run the same five 
 
 ## Solution
 
-IncidentPilot pairs a FastAPI investigation agent with a Next.js SRE console:
+IncidentPilot pairs a FastAPI investigation agent with a two-surface Next.js frontend — a public marketing site and a dark-first SRE console:
 
 - A **strategy engine** builds the investigation plan from three inputs: recalled Hindsight memories, *current* telemetry evidence, and LLM reasoning.
 - A **tool layer** of deterministic synthetic telemetry (`check_metrics`, `query_logs`, `check_database`, `check_redis`, `check_recent_deployments`) scoped by `incident_id` — the same tools return different evidence for different incidents on the same service.
 - **Engineer feedback** (`accept / reject / correct`) is retained into Hindsight, so the agent's next investigation literally incorporates what a real engineer corrected.
-- A **baseline-vs-memory comparison** shows the strategy before and after memory, plus a **learning evolution** panel computed from PostgreSQL runs *and* live recall.
+- A **baseline-vs-memory comparison** shows the strategy before and after memory, plus a **learning evolution** page computed from PostgreSQL runs *and* live recall.
+
+### Frontend surfaces
+
+| Route | Surface | What it is |
+| --- | --- | --- |
+| `/` | Marketing (light-first) | Landing page: hero, pipeline, capabilities, evidence comparison, architecture. The **Demo** CTA opens the live console. |
+| `/console` | Console (dark-first) | Overview: engine health, on-call queue, service rollups, learned strategy, demo controls. |
+| `/console/incidents` | Console | Full incident catalog — search, severity/service/tier filters, sorting. |
+| `/console/incidents/[id]` | Console | Investigation workspace: run triggers, execution timeline, memory recall, feedback, resolve. |
+| `/console/compare` | Console | Baseline vs memory side-by-side, from two real runs. |
+| `/console/learning` | Console | The learning loop, before/after shift, learned strategy, run-by-run evolution. |
+
+The theme defaults to dark under `/console/*` and light elsewhere, is togglable, and persists in `localStorage` under `ip.theme`.
+
+Every number rendered in either surface comes from a real API response — there are no hard-coded statistics. When the backend is unreachable the console says so rather than showing placeholder values.
 
 ## Why Hindsight
 
@@ -81,15 +96,17 @@ POST /demo/seed     # load Tier 1 knowledge into memory
 POST /demo/replay   # replay scripted Tier 2 episodes with real feedback + retention
 ```
 
-Run the demo flow, then open the dashboard → **Baseline vs Memory** for `INC-2001`: baseline first step ≠ `check_redis`; memory first step = `check_redis`. **Learning Evolution** shows the replayed episode paths labelled "scripted feedback".
+Run the demo flow, then click **Demo** on the landing page (or go straight to `/console`) → **Baseline vs memory** for `INC-2001`: baseline first step ≠ `check_redis`; memory first step = `check_redis`. **Learning evolution** shows the replayed episode paths labelled "scripted feedback".
 
 ## Screenshots
 
 The live demo is the source of truth — run the demo flow and screenshot:
-- Dashboard (incidents, learned patterns, demo controls)
-- Investigation page (timeline + memory panel)
-- Learning Evolution
-- Baseline vs Memory
+- Landing page (`/`)
+- Overview (`/console`) — on-call queue, service rollups, demo controls
+- Incident catalog (`/console/incidents`)
+- Investigation workspace (`/console/incidents/INC-2001`) — timeline, evidence, memory panel
+- Baseline vs memory (`/console/compare`)
+- Learning evolution (`/console/learning`)
 
 ## Tech Stack
 
@@ -151,7 +168,7 @@ cd frontend && npm run test
 cd frontend && npm run build
 ```
 
-Current: **75 backend tests, 31 frontend tests, clean `next build`.**
+Current: **75 backend tests, 36 frontend tests, clean `next build`.**
 
 ## Evaluation
 
@@ -175,9 +192,21 @@ backend/
     schemas/          # Pydantic v2 models
   tests/              # 75 tests (agent, strategy, state, API, memory seams)
 frontend/
-  app/                # dashboard, /incidents/[id], /learning, /compare
+  app/
+    page.tsx           # marketing landing page
+    layout.tsx         # root layout, metadata, theme bootstrap
+    globals.css        # design system (.mkt-* marketing, .cs-* console)
+    lib/               # icon set, theme + scroll-reveal hooks
+    console-shell.tsx  # console chrome (rail, topbar, health)
+    console-ui.tsx     # console UI kit (panels, KPIs, pills, stream…)
+    console/
+      page.tsx                     # overview
+      incidents/page.tsx           # catalog
+      incidents/[id]/page.tsx      # investigation workspace
+      compare/page.tsx             # baseline vs memory
+      learning/page.tsx            # learning evolution
   lib/                # typed API client + pure transforms
-  tests/              # 17 Vitest tests
+  tests/              # 36 Vitest tests
 data/incidents/       # 34-incident synthetic dataset (tier1/eval/replay/demo)
 docs/                 # architecture, hindsight memory, demo script, evaluation
 docker-compose.yml

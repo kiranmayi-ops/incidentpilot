@@ -10,6 +10,7 @@ import {
   firstStepDistribution,
   beforeAfter,
   servicePatterns,
+  serviceRollups,
   type DashboardStats,
 } from "@/lib/transforms";
 import type { Incident, LearningEvolutionItem, LearningStrategy } from "@/lib/api";
@@ -230,5 +231,48 @@ describe("servicePatterns", () => {
     ]);
     expect(patterns[0]).toEqual({ service: "checkout-api", first_step: "check_redis", count: 2 });
     expect(patterns[1]).toEqual({ service: "payment-api", first_step: "check_database", count: 1 });
+  });
+});
+
+describe("serviceRollups", () => {
+  const incidents = [
+    inc("INC-2001", "checkout-api", "feedback", "SEV1"),
+    inc("INC-2002", "payments-gw", "resolved", "SEV2"),
+  ];
+
+  it("does not treat a baseline run as a learned first check", () => {
+    // The baseline opened on deployments; memory opened on Redis. Rolling both up
+    // would tie, and the pre-memory control would win the tie by insertion order.
+    const [rollup] = serviceRollups(incidents, [
+      { ...evo("INC-2001", ["check_recent_deployments"], false), kind: "baseline" },
+      { ...evo("INC-2001", ["check_redis"], true), kind: "memory" },
+    ]);
+    expect(rollup.first_step).toBe("check_redis");
+    expect(rollup.first_step_count).toBe(1);
+  });
+
+  it("reports null when only baseline runs exist", () => {
+    const [rollup] = serviceRollups(incidents, [
+      { ...evo("INC-2001", ["check_recent_deployments"], false), kind: "baseline" },
+    ]);
+    expect(rollup.first_step).toBeNull();
+  });
+
+  it("counts the most frequent learned step across incidents", () => {
+    const [rollup] = serviceRollups(incidents, [
+      { ...evo("INC-2001", ["check_redis"], true), kind: "memory" },
+      { ...evo("INC-2001", ["check_redis"], true), kind: "memory" },
+      { ...evo("INC-2001", ["check_database"], true), kind: "live" },
+    ]);
+    expect(rollup.first_step).toBe("check_redis");
+    expect(rollup.first_step_count).toBe(2);
+  });
+
+  it("orders by worst severity then active count", () => {
+    const rollups = serviceRollups(incidents, []);
+    expect(rollups.map((r) => r.service)).toEqual(["checkout-api", "payments-gw"]);
+    expect(rollups[0].worst).toBe("SEV1");
+    expect(rollups[0].active).toBe(1);
+    expect(rollups[1].resolved).toBe(1);
   });
 });

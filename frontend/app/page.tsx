@@ -1,488 +1,695 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  EngineAPI,
-  type Health,
-  type Incident,
-  type LearningStrategy,
-  type LearningEvolutionItem,
-} from "@/lib/api";
-import {
-  dashboardStats,
-  efficiencyFromEvolution,
-  learnedOverview,
-  incidentActivity,
-  servicePatterns,
-  firstStepDistribution,
-} from "@/lib/transforms";
-import {
-  Badge,
-  BarList,
-  Button,
-  CounterCaseCard,
-  Empty,
-  ErrorBox,
-  FilterBar,
-  FilterChip,
-  Hero,
-  Icon,
-  IncidentListItem,
-  Notice,
-  Pipeline,
-  Section,
-  Spinner,
-  Stat,
-} from "./components";
+import { useEffect, useState } from "react";
+import { Icon, type IconName } from "./lib/icons";
+import { ThemeToggle, useRevealRoot } from "./lib/theme";
 
-function hindsightTone(status?: string): "ok" | "warn" | "bad" | undefined {
-  if (status === "ok") return "ok";
-  if (status === "unconfigured" || status === "degraded") return "warn";
-  if (status) return "bad";
-  return undefined;
+/* ============================================================== nav data == */
+
+const NAV_LINKS: Array<{ href: string; label: string }> = [
+  { href: "#how", label: "How it works" },
+  { href: "#capabilities", label: "Capabilities" },
+  { href: "#evidence", label: "Evidence" },
+  { href: "#architecture", label: "Architecture" },
+];
+
+const FOOTER_COLS: Array<{ title: string; links: Array<{ label: string; href: string; external?: boolean }> }> = [
+  {
+    title: "Product",
+    links: [
+      { label: "Open the console", href: "/console" },
+      { label: "How it works", href: "#how" },
+      { label: "Capabilities", href: "#capabilities" },
+      { label: "Evidence", href: "#evidence" },
+    ],
+  },
+  {
+    title: "Workspace",
+    links: [
+      { label: "Overview", href: "/console" },
+      { label: "Incident catalog", href: "/console/incidents" },
+      { label: "Baseline vs memory", href: "/console/compare" },
+      { label: "Learning evolution", href: "/console/learning" },
+    ],
+  },
+  {
+    title: "Reference",
+    links: [
+      { label: "Architecture", href: "#architecture" },
+      { label: "Guardrails", href: "#guardrails" },
+      {
+        label: "Source repository",
+        href: "https://github.com/kiranmayi-ops/incidentpilot",
+        external: true,
+      },
+    ],
+  },
+];
+
+/* ================================================================ hooks === */
+
+function useStuck() {
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setStuck(window.scrollY > 12);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return stuck;
 }
 
-type SevFilter = "all" | "SEV1" | "SEV2" | "SEV3";
+/* ============================================================== sections == */
 
-const normSev = (s: string) => s.replace(/[^a-z0-9]/gi, "").toUpperCase();
+function Hero() {
+  return (
+    <section className="mkt-hero">
+      <div className="mkt-hero-mesh" aria-hidden="true" />
+      <div className="mkt-hero-grid" aria-hidden="true" />
+      <div className="mkt-hero-inner">
+        <div>
+          <span className="kicker brand">
+            Memory-first incident response
+            <span className="cs-pill mem" style={{ marginLeft: 4 }}>
+              <i /> Hindsight-powered
+            </span>
+          </span>
+          <h1 className="mkt-h1">
+            Stop paying the same
+            <br />
+            <em>ten minutes</em> twice.
+          </h1>
+          <p className="mkt-lede">
+            IncidentPilot is an SRE investigation agent with long-term memory. It recalls what your
+            engineers already learned, challenges that memory against live telemetry, and opens the
+            next investigation at the layer that actually broke — before the clock starts.
+          </p>
+          <div className="mkt-hero-actions">
+            <Link href="/console" className="mkt-btn mkt-btn-primary mkt-btn-lg">
+              Launch live demo
+              <Icon name="arrow-right" />
+            </Link>
+            <Link href="/console/compare" className="mkt-btn mkt-btn-ghost mkt-btn-lg">
+              <Icon name="scale" />
+              See memory change a plan
+            </Link>
+          </div>
+          <div className="mkt-hero-note">
+            <span>
+              <Icon name="check" /> Real recall, real feedback retention
+            </span>
+            <span>
+              <Icon name="check" /> No mocked strategies
+            </span>
+            <span>
+              <Icon name="check" /> Runs against your telemetry tools
+            </span>
+          </div>
+        </div>
 
-export default function DashboardPage() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [incidents, setIncidents] = useState<Incident[] | null>(null);
-  const [strategy, setStrategy] = useState<LearningStrategy | null>(null);
-  const [evolution, setEvolution] = useState<LearningEvolutionItem[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [demoBusy, setDemoBusy] = useState<string | null>(null);
-  const [demoMsg, setDemoMsg] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [sev, setSev] = useState<SevFilter>("all");
-
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      const [h, inc, strat, evo] = await Promise.all([
-        EngineAPI.health(),
-        EngineAPI.incidents(),
-        EngineAPI.learningStrategy(),
-        EngineAPI.learningEvolution(),
-      ]);
-      setHealth(h);
-      setIncidents(inc.items);
-      setStrategy(strat);
-      setEvolution(evo.items);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  async function demoAction(kind: "reset" | "seed" | "replay") {
-    setDemoBusy(kind);
-    setDemoMsg(null);
-    setError(null);
-    try {
-      if (kind === "reset") {
-        const out = await EngineAPI.demoReset();
-        setHealth(await EngineAPI.health());
-        setDemoMsg(
-          `Fresh demo memory bank "${out.bank_id}" (phase ${out.phase}). Run tier-1 seed + replay to rebuild the story.`,
-        );
-      } else if (kind === "seed") {
-        const out = await EngineAPI.demoSeed();
-        const failed = out.failures.length ? `; failures: ${out.failures.join(", ")}` : "";
-        setDemoMsg(`Seeded ${out.seeded.length} tier-1 experiences into Hindsight.${failed}`);
-      } else {
-        const out = await EngineAPI.demoReplay();
-        const ok = out.replayed.filter((r) => r.retained);
-        const failed = out.failures.length ? `; failures: ${out.failures.join(", ")}` : "";
-        setDemoMsg(
-          `Replayed ${ok.length}/3 scripted checkout incidents through the real pipeline (recall → strategy → investigate → scripted feedback → retain).${failed}`,
-        );
-      }
-      const evo = await EngineAPI.learningEvolution();
-      setEvolution(evo.items);
-      const strat = await EngineAPI.learningStrategy();
-      setStrategy(strat);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDemoBusy(null);
-    }
-  }
-
-  const stats = useMemo(() => (incidents ? dashboardStats(incidents) : null), [incidents]);
-  const eff = useMemo(() => (evolution ? efficiencyFromEvolution(evolution) : null), [evolution]);
-  const learn = useMemo(
-    () => (strategy ? learnedOverview(strategy, evolution?.length ?? 0) : null),
-    [strategy, evolution],
-  );
-  const activity = useMemo(
-    () => (incidents && evolution ? incidentActivity(incidents, evolution) : new Map()),
-    [incidents, evolution],
-  );
-  const patterns = useMemo(
-    () => (incidents && evolution ? servicePatterns(incidents, evolution).slice(0, 5) : []),
-    [incidents, evolution],
-  );
-  const distribution = useMemo(
-    () => (evolution ? firstStepDistribution(evolution).slice(0, 6) : []),
-    [evolution],
-  );
-
-  const hindsight = String(health?.hindsight.status ?? "unknown");
-  const degraded = health?.status === "degraded";
-
-  const filtered = useMemo(() => {
-    if (!incidents) return [];
-    const q = query.trim().toLowerCase();
-    return incidents.filter((inc) => {
-      if (sev !== "all" && normSev(inc.severity) !== sev) return false;
-      if (!q) return true;
-      return (
-        inc.incident_id.toLowerCase().includes(q) ||
-        inc.service.toLowerCase().includes(q) ||
-        inc.symptoms.some((s) => s.toLowerCase().includes(q)) ||
-        (inc.root_cause ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [incidents, query, sev]);
-
-  const sevCount = useCallback(
-    (s: SevFilter) =>
-      !incidents
-        ? 0
-        : s === "all"
-          ? incidents.length
-          : incidents.filter((i) => normSev(i.severity) === s).length,
-    [incidents],
-  );
-
-  const heroBlock = (
-    <Hero
-      eyebrow="SRE Platform"
-      title="Incident"
-      highlight="command deck"
-      sub="AI-powered incident investigation that learns from every engineer correction through Hindsight long-term memory."
-    />
-  );
-
-  if (error && !incidents)
-    return (
-      <div>
-        {heroBlock}
-        <ErrorBox message={`Backend unreachable: ${error}`} onRetry={() => void load()} />
+        <div className="mkt-shot" aria-label="Preview of the IncidentPilot investigation console">
+          <div className="mkt-shot-bar">
+            <div className="mkt-shot-dots" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </div>
+            <span className="mkt-shot-title mono">incidentpilot · INC-2001 · checkout-api</span>
+          </div>
+          <div className="mkt-shot-body">
+            <div className="mkt-shot-row hi">
+              <div>
+                <div className="mkt-shot-row-t">checkout latency increased · 5xx</div>
+                <div className="mkt-shot-row-s">
+                  p99 1919ms · errors 4.98% · db pool 79%
+                </div>
+              </div>
+              <span className="cs-pill bad">SEV1</span>
+            </div>
+            <div className="mkt-shot-row">
+              <div>
+                <div className="mkt-shot-row-t">Recalled from long-term memory</div>
+                <div className="mkt-shot-row-s">3 experiences · 2 prior checkout-api incidents</div>
+              </div>
+              <span className="mkt-shot-step">3 recalled</span>
+            </div>
+            <div className="mkt-shot-row">
+              <div>
+                <div className="mkt-shot-row-t">Planned strategy</div>
+                <div className="mkt-shot-row-s">memory-ranked, evidence-constrained</div>
+              </div>
+              <span className="mkt-shot-step">1. check_redis</span>
+            </div>
+            <div className="mkt-shot-row">
+              <div>
+                <div className="mkt-shot-row-t">Executed · check_redis</div>
+                <div className="mkt-shot-row-s">pool 97% · 208 timeouts · 1094ms avg</div>
+              </div>
+              <span className="cs-pill bad">degraded</span>
+            </div>
+            <div className="mkt-shot-foot">
+              <span>
+                Engineer correction retained → next incident opens at{" "}
+                <b>check_redis</b>
+              </span>
+              <Icon name="sparkles" size={16} style={{ color: "var(--memory)" }} />
+            </div>
+          </div>
+        </div>
       </div>
-    );
+    </section>
+  );
+}
 
-  if (!stats || !eff || !health || !incidents || !evolution) {
-    return (
-      <div>
-        {heroBlock}
-        <Spinner />
+function TrustStrip() {
+  const items = [
+    { n: "34", l: "Synthetic incidents across 4 evaluation tiers" },
+    { n: "5", l: "Deterministic telemetry tools the agent can call" },
+    { n: "2", l: "Memory channels: recalled prior vs live evidence" },
+    { n: "0", l: "Hard-coded strategies or leaked ground truth" },
+  ];
+  return (
+    <section className="mkt-strip">
+      <div className="mkt-strip-inner">
+        {items.map((s) => (
+          <div className="mkt-strip-item" key={s.l}>
+            <div className="mkt-strip-n">
+              {s.n === "0" ? <em>0</em> : s.n}
+            </div>
+            <div className="mkt-strip-l">{s.l}</div>
+          </div>
+        ))}
       </div>
-    );
-  }
+    </section>
+  );
+}
+
+const PIPELINE: Array<{ t: string; d: string; ch?: "memory" | "evidence"; code?: string }> = [
+  {
+    t: "Incident arrives",
+    d: "Symptoms and live telemetry enter the workspace with service, environment and severity.",
+    ch: "evidence",
+  },
+  {
+    t: "Recall",
+    d: "A query is drafted from the evidence and the memory bank is searched for past experience.",
+    ch: "memory",
+    code: "recall(top=n)",
+  },
+  {
+    t: "Strategy",
+    d: "Recalled memory, current signals and LLM reasoning are folded into one ranked tool order.",
+  },
+  {
+    t: "Execute + review",
+    d: "Tools run in order; the agent proposes a root cause and an engineer accepts or corrects it.",
+  },
+  {
+    t: "Retain",
+    d: "The episode — including the correction — is written back to long-term memory for next time.",
+    ch: "memory",
+  },
+];
+
+function HowItWorks() {
+  return (
+    <section className="mkt-section" id="how">
+      <div className="mkt-section-head" data-reveal>
+        <span className="kicker">The loop</span>
+        <h2 className="mkt-h2">Five steps, and only one of them is new code</h2>
+        <p className="mkt-sub">
+          Every investigation runs the same loop. The only variable is what memory contributed to
+          step three — which is precisely the point.
+        </p>
+      </div>
+      <div className="mkt-steps" data-reveal>
+        {PIPELINE.map((s, i) => (
+          <div className="mkt-step" key={s.t} data-channel={s.ch}>
+            <div className="mkt-step-n">{String(i + 1).padStart(2, "0")}</div>
+            <h4>{s.t}</h4>
+            <p>
+              {s.d}
+              {s.code ? (
+                <>
+                  {" "}
+                  <code>{s.code}</code>
+                </>
+              ) : null}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ProblemSolution() {
+  return (
+    <section className="mkt-section tight">
+      <div className="mkt-section-head center" data-reveal>
+        <span className="kicker">Why it matters</span>
+        <h2 className="mkt-h2">Runbooks rot. Memory doesn&apos;t — if it can be questioned.</h2>
+      </div>
+      <div className="mkt-split" data-reveal>
+        <article className="mkt-card bad">
+          <div className="mkt-card-tag">
+            <Icon name="clock" />
+            Without memory
+          </div>
+          <h3>The first ten minutes are guesswork</h3>
+          <p>
+            On-call engineers re-run the same top-down checklist on every incident. The wiki page was
+            written after an incident two years ago, the runbook has not been updated since, and
+            nobody remembers that Redis was the culprit last Tuesday.
+          </p>
+          <ul>
+            <li>
+              <Icon name="x-circle" />
+              The right answer lives in three engineers&apos; heads and one dead Slack thread
+            </li>
+            <li>
+              <Icon name="x-circle" />
+              The same five checks burn the window before anyone touches the actual failure
+            </li>
+            <li>
+              <Icon name="x-circle" />
+              Every incident response starts from zero, so nothing compounds
+            </li>
+          </ul>
+        </article>
+        <article className="mkt-card good">
+          <div className="mkt-card-tag">
+            <Icon name="brain" />
+            With IncidentPilot
+          </div>
+          <h3>The next incident starts where the last one ended</h3>
+          <p>
+            Each resolved incident — and each engineer correction — is retained as an experience
+            narrative in vectorised long-term memory. The next similar incident recalls it, ranks it
+            against fresh telemetry, and reorders the plan accordingly.
+          </p>
+          <ul>
+            <li>
+              <Icon name="check-circle" />
+              Recall is automatic and similarity-based, not a checklist someone maintains
+            </li>
+            <li>
+              <Icon name="check-circle" />
+              Live evidence is always a ranking input, so stale memory is demoted automatically
+            </li>
+            <li>
+              <Icon name="check-circle" />
+              Every correction is a training signal that lands in memory the same day
+            </li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+const BENTO: Array<{
+  span: 2 | 3 | 6;
+  icon: IconName;
+  ic: "brand" | "mem" | "evd";
+  t: string;
+  d: string;
+  mini?: { v: string; l: string };
+}> = [
+  {
+    span: 3,
+    icon: "brain",
+    ic: "mem",
+    t: "Long-term memory, not a rules table",
+    d: "Experience narratives — symptoms taken, steps that paid off, steps that were dead ends, the final root cause and the engineer's own correction — are embedded and recalled by similarity. Nothing is a hard-coded per-service order.",
+    mini: { v: "top(n)", l: "similarity recall per investigation" },
+  },
+  {
+    span: 3,
+    icon: "scale",
+    ic: "evd",
+    t: "A contradiction gate, not a rubber stamp",
+    d: "Memory is a prior, never a mandate. When live telemetry contradicts a recalled lesson, the engine zeroes the stale prior and re-ranks on evidence — the failure mode that makes most memory-driven agents dangerous in production.",
+  },
+  {
+    span: 3,
+    icon: "terminal",
+    ic: "evd",
+    t: "Tools that report telemetry, not answers",
+    d: "check_metrics, query_logs, check_database, check_redis, check_recent_deployments. Deterministic, allowlisted and scoped per incident — the same tool returns opposite evidence for two incidents on the same service.",
+  },
+  {
+    span: 3,
+    icon: "plug",
+    ic: "evd",
+    t: "LLM reasoning with a deterministic fallback",
+    d: "Strategy is produced as validated structural JSON, constrained to the tool allowlist with cited incident ids cross-checked against real recall output. If the provider is down, memory + evidence ranking still produces a plan.",
+  },
+  {
+    span: 6,
+    icon: "git-branch",
+    ic: "mem",
+    t: "Every run is reproducible: run it with memory, run it without, diff the two",
+    d: "The Baseline vs Memory view executes the same incident twice — once with recall disabled, once enabled — and shows you the first check each run opened at, the plan behind it, and the tool output that followed. When the first check differs, you are looking at memory doing real work.",
+    mini: { v: "2×", l: "same incident, same tools, different opening move" },
+  },
+];
+
+function Capabilities() {
+  return (
+    <section className="mkt-section" id="capabilities">
+      <div className="mkt-section-head" data-reveal>
+        <span className="kicker">Capabilities</span>
+        <h2 className="mkt-h2">Built to be inspected, not just believed</h2>
+        <p className="mkt-sub">
+          A memory-driven agent is only trustworthy if you can open the box. Every claim on this
+          page is rendered from a real API response in the console.
+        </p>
+      </div>
+      <div className="mkt-bento" data-reveal>
+        {BENTO.map((c) => (
+          <article
+            className={`mkt-bento-card ${c.span === 3 ? "span-3" : c.span === 6 ? "span-6" : ""}`}
+            key={c.t}
+          >
+            <div className={`mkt-bento-ic ${c.ic === "mem" ? "mem" : c.ic === "evd" ? "evd" : ""}`}>
+              <Icon name={c.icon} />
+            </div>
+            <h3>{c.t}</h3>
+            <p>{c.d}</p>
+            {c.mini && (
+              <div className="mkt-mini">
+                <b>{c.mini.v}</b>
+                <span>{c.mini.l}</span>
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Evidence() {
+  return (
+    <section className="mkt-section" id="evidence">
+      <div className="mkt-section-head center" data-reveal>
+        <span className="kicker">Evidence, not adjectives</span>
+        <h2 className="mkt-h2">Run it twice. Watch the opening move change.</h2>
+        <p className="mkt-sub">
+          The console runs both variants against the real engine. No screenshots, no fixtures — these
+          are the two strategies the agent actually produced.
+        </p>
+      </div>
+      <div className="mkt-compare" data-reveal>
+        <div className="mkt-compare-side">
+          <div className="mkt-compare-label">Baseline · recall disabled</div>
+          <div className="mkt-compare-step">check_recent_deployments</div>
+          <div className="mkt-compare-meta">
+            Generic top-down evidence order. Healthy, then healthy, then degraded — the cause is
+            found third.
+          </div>
+        </div>
+        <div className="mkt-compare-rail" aria-hidden="true">
+          <span>VS</span>
+        </div>
+        <div className="mkt-compare-side mem">
+          <div className="mkt-compare-label">With memory · recall enabled</div>
+          <div className="mkt-compare-step">check_redis</div>
+          <div className="mkt-compare-meta">
+            Two prior checkout-api episodes and an engineer correction were recalled, so the agent
+            opened at the layer that actually broke.
+          </div>
+        </div>
+      </div>
+      <div className="mkt-hero-actions" style={{ justifyContent: "center", marginTop: 32 }} data-reveal>
+        <Link href="/console/compare" className="mkt-btn mkt-btn-primary">
+          Reproduce this comparison
+          <Icon name="arrow-right" />
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function Guardrails() {
+  return (
+    <section className="mkt-section" id="guardrails">
+      <div className="mkt-guard" data-reveal>
+        <div>
+          <div className="mkt-guard-ic">
+            <Icon name="shield" />
+          </div>
+          <h3>Current evidence overrides memory. Always.</h3>
+          <p>
+            A memory system that cannot be wrong is a liability. IncidentPilot ranks recalled
+            experience <em>alongside</em> live telemetry, and when the two disagree the contradiction
+            gate discards the stale prior instead of following it. The evaluation set deliberately
+            contains incidents where the recalled lesson is the wrong move.
+          </p>
+          <div className="mkt-stack" style={{ marginTop: 24 }}>
+            <span>Contradiction gate</span>
+            <span>Tool allowlist</span>
+            <span>Cited-id cross-check</span>
+            <span>Grounded JSON strategies</span>
+          </div>
+        </div>
+        <div className="mkt-guard-demo">
+          <h4>Counter-case in the eval set</h4>
+          <div className="mkt-guard-line">
+            <span>redis healthy</span>
+            <span style={{ color: "var(--text-4)" }}>·</span>
+            <span>postgres 96%</span>
+            <span className="tag">db first</span>
+          </div>
+          <div className="mkt-guard-line">
+            <span>redis degraded</span>
+            <span style={{ color: "var(--text-4)" }}>·</span>
+            <span>pool 97%</span>
+            <span className="tag">redis first</span>
+          </div>
+          <div className="mkt-guard-line suppressed">
+            <span>recalled &ldquo;always check Redis&rdquo;</span>
+            <span className="tag">suppressed</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const ARCH: Array<{ tag: string; t: string; d: string; kind?: "memory" | "evidence" }> = [
+  { tag: "client", t: "Next.js 15 console", d: "Marketing site, incident catalog, investigation workspace, comparison and learning views." },
+  { tag: "api", t: "FastAPI", d: "Typed endpoints for health, catalog, investigate, feedback, resolve, demo and learning." },
+  { tag: "agent", t: "Investigation agent", d: "Owns one incident: recall → strategy → execute → hypothesis → propose root cause." },
+  { tag: "memory", t: "Hindsight memory", d: "Vector long-term store of experience narratives. Owns extraction, embedding and similarity recall.", kind: "memory" },
+  { tag: "evidence", t: "Strategy engine", d: "Ranks recalled memory against current signals, with LLM reasoning and a deterministic fallback.", kind: "evidence" },
+  { tag: "tools", t: "Telemetry tools", d: "Five deterministic, allowlisted, incident-scoped tools. Raw telemetry only — never the answer.", kind: "evidence" },
+  { tag: "state", t: "PostgreSQL", d: "Application state only: catalog mirror, runs, steps, feedback. Never strategy knowledge." },
+  { tag: "human", t: "Engineer", d: "Accept, reject or correct. The correction is the highest-value memory the system ever stores." },
+];
+
+function Architecture() {
+  return (
+    <section className="mkt-section" id="architecture">
+      <div className="mkt-section-head" data-reveal>
+        <span className="kicker">Architecture</span>
+        <h2 className="mkt-h2">Memory in one place, state in another</h2>
+        <p className="mkt-sub">
+          The relational database stores what happened. The memory bank stores what was learned. The
+          strategy engine only ever reads knowledge from memory — never from the catalog.
+        </p>
+      </div>
+      <div className="mkt-arch" data-reveal>
+        {ARCH.map((n) => (
+          <article className="mkt-arch-node" data-kind={n.kind} key={n.t}>
+            <span className="mkt-arch-tag">{n.tag}</span>
+            <h4>{n.t}</h4>
+            <p>{n.d}</p>
+          </article>
+        ))}
+      </div>
+      <div className="mkt-stack" style={{ marginTop: 34 }} data-reveal>
+        {[
+          "Python 3.12",
+          "FastAPI",
+          "SQLAlchemy 2 (async)",
+          "Pydantic v2",
+          "Hindsight",
+          "Next.js 15",
+          "TypeScript",
+          "React 19",
+          "Vitest",
+          "PostgreSQL",
+          "Docker Compose",
+        ].map((s) => (
+          <span key={s}>{s}</span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FinalCta() {
+  return (
+    <section className="mkt-cta">
+      <div className="mkt-cta-box" data-reveal>
+        <span className="kicker brand" style={{ justifyContent: "center" }}>
+          Open the console
+        </span>
+        <h2>Give the next incident a head start.</h2>
+        <p>
+          The demo bank is pre-warmed with tier-1 knowledge and a scripted replay, so you land on a
+          console that already has a memory story to tell — and every button runs the real pipeline.
+        </p>
+        <div className="mkt-cta-actions">
+          <Link href="/console" className="mkt-btn mkt-btn-primary mkt-btn-lg">
+            Launch live demo
+            <Icon name="arrow-right" />
+          </Link>
+          <Link href="/console/incidents" className="mkt-btn mkt-btn-ghost mkt-btn-lg">
+            Browse the incident catalog
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="mkt-footer">
+      <div className="mkt-footer-inner">
+        <div className="mkt-footer-brand">
+          <Link href="/" className="mkt-logo">
+            <span className="mkt-logo-mark" aria-hidden="true">
+              IP
+            </span>
+            <span className="mkt-logo-name">
+              IncidentPilot
+              <span className="mkt-logo-sub">Memory-first SRE</span>
+            </span>
+          </Link>
+          <p>
+            An investigation agent that recalls your past incidents, challenges them against live
+            telemetry, and learns from every engineer correction.
+          </p>
+        </div>
+        {FOOTER_COLS.map((c) => (
+          <div className="mkt-footer-col" key={c.title}>
+            <h4>{c.title}</h4>
+            <ul>
+              {c.links.map((l) =>
+                l.external ? (
+                  <li key={l.label}>
+                    <a href={l.href} target="_blank" rel="noreferrer noopener">
+                      {l.label}
+                      <Icon
+                        name="external"
+                        size={11}
+                        style={{ display: "inline", verticalAlign: "-1px", marginLeft: 5 }}
+                      />
+                    </a>
+                  </li>
+                ) : (
+                  <li key={l.label}>
+                    <Link href={l.href}>{l.label}</Link>
+                  </li>
+                ),
+              )}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <div className="mkt-footer-bottom">
+        <span>IncidentPilot — synthetic telemetry, real pipeline, honest numbers.</span>
+        <span>All data in this demo is synthetic and generated for evaluation.</span>
+      </div>
+    </footer>
+  );
+}
+
+/* ================================================================== page == */
+
+export default function MarketingHome() {
+  const stuck = useStuck();
+  const [open, setOpen] = useState(false);
+  useRevealRoot();
 
   return (
-    <div>
-      {/* ============================== HERO ============================== */}
-      <Hero
-        eyebrow="SRE Platform · Live"
-        title="Every incident makes the next one"
-        highlight="faster to solve"
-        sub="The investigation agent recalls past experience from Hindsight long-term memory, weighs it against current telemetry, and adapts its strategy with every engineer correction."
-        stats={[
-          { value: stats.total, label: "Incidents in catalog" },
-          { value: stats.active, label: "Active now", tone: stats.active > 0 ? "gold" : "cyan" },
-          { value: stats.resolved, label: "Resolved" },
-          {
-            value: eff.retention_rate === null ? "—" : `${eff.retention_rate}%`,
-            label: `Experience retained (${eff.retained_runs}/${eff.completed_runs})`,
-          },
-          { value: hindsight, label: "Hindsight memory" },
-        ]}
-        actions={
-          <Link href="/compare" className="btn memory-btn big">
-            See memory change a strategy
-            <Icon kind="arrow" size={15} />
+    <div className="mkt">
+      <div className="mkt-announce">
+        <div className="mkt-announce-inner">
+          <span className="mkt-announce-badge">New</span>
+          <span>
+            Baseline vs Memory now runs both strategies live —{" "}
+            <Link href="/console/compare">try the comparison</Link>
+          </span>
+        </div>
+      </div>
+
+      <header className="mkt-nav" data-stuck={stuck}>
+        <div className="mkt-nav-inner">
+          <Link href="/" className="mkt-logo" aria-label="IncidentPilot home">
+            <span className="mkt-logo-mark" aria-hidden="true">
+              IP
+            </span>
+            <span className="mkt-logo-name">
+              IncidentPilot
+              <span className="mkt-logo-sub">Memory-first SRE</span>
+            </span>
           </Link>
-        }
-      />
-
-      {/* ==================== THE LEARNING PIPELINE ==================== */}
-      <Pipeline />
-
-      {degraded && (
-        <Notice tone="warn" title="Engine is running with degraded configuration">
-          <p>
-            Hindsight: <span className="mono">{hindsight}</span> · database:{" "}
-            <span className="mono">{String(health.database.status ?? "unknown")}</span>. Core
-            investigation features may be limited.
-          </p>
-        </Notice>
-      )}
-
-      {/* ======================= KPI DECK ======================= */}
-      <div className="stat-strip">
-        <Stat label="Incidents" value={stats.total} hint="in the catalog" tone="info" />
-        <Stat
-          label="Active (unresolved)"
-          value={stats.active}
-          tone={stats.active > 0 ? "warn" : "ok"}
-        />
-        <Stat label="Resolved" value={stats.resolved} tone="ok" />
-        <Stat
-          label="Avg steps / run"
-          value={eff.avg_steps ?? "—"}
-          hint="tool executions per investigation"
-        />
-        <Stat
-          label="Hindsight"
-          value={hindsight}
-          tone={hindsightTone(hindsight)}
-          hint="long-term memory provider"
-        />
-      </div>
-
-      {/* =================== INCIDENT COMMAND LIST =================== */}
-      <Section
-        id="incidents"
-        eyebrow="Active Catalog"
-        title="Incidents"
-        description="Select an incident to open the investigation workspace. The gold chip marks the agent's memory-informed first check."
-        actions={
-          <div className="muted" style={{ fontSize: 12.5 }}>
-            {filtered.length} of {incidents.length} shown
+          <nav className="mkt-nav-links" aria-label="Marketing">
+            {NAV_LINKS.map((l) => (
+              <a className="mkt-nav-link" href={l.href} key={l.href}>
+                {l.label}
+              </a>
+            ))}
+          </nav>
+          <div className="mkt-nav-actions">
+            <ThemeToggle />
+            <Link href="/console" className="mkt-btn mkt-btn-primary">
+              Open console
+              <Icon name="arrow-up-right" />
+            </Link>
+            <button
+              type="button"
+              className="mkt-nav-toggle"
+              onClick={() => setOpen((o) => !o)}
+              aria-expanded={open}
+              aria-label="Toggle navigation"
+            >
+              <Icon name={open ? "x-circle" : "panel-left"} size={17} />
+            </button>
           </div>
-        }
-      >
-        <FilterBar query={query} onQuery={setQuery}>
-          {(["all", "SEV1", "SEV2", "SEV3"] as const).map((s) => (
-            <FilterChip key={s} on={sev === s} count={sevCount(s)} onClick={() => setSev(s)}>
-              {s === "all" ? "All severities" : s}
-            </FilterChip>
+        </div>
+        <div className="mkt-mobile" data-open={open}>
+          {NAV_LINKS.map((l) => (
+            <a href={l.href} key={l.href} onClick={() => setOpen(false)}>
+              {l.label}
+            </a>
           ))}
-        </FilterBar>
-
-        <div className="incident-list-container">
-          {filtered.map((inc) => {
-            const act = activity.get(inc.incident_id);
-            return (
-              <IncidentListItem
-                key={inc.incident_id}
-                id={inc.incident_id}
-                service={inc.service}
-                severity={inc.severity}
-                status={inc.status}
-                symptoms={inc.symptoms}
-                environment={inc.environment}
-                tier={inc.tier}
-                timestamp={inc.timestamp}
-                agentActivity={
-                  act
-                    ? {
-                        first_step: act.first_step,
-                        feedback_kind: act.feedback_kind,
-                        retained: act.retained,
-                      }
-                    : undefined
-                }
-              />
-            );
-          })}
+          <Link href="/console" className="mkt-btn mkt-btn-primary" onClick={() => setOpen(false)}>
+            Open console
+            <Icon name="arrow-right" />
+          </Link>
         </div>
-        {filtered.length === 0 && (
-          <Empty title="No incidents match this filter">
-            Try clearing the search box or choosing a different severity.
-          </Empty>
-        )}
-      </Section>
+      </header>
 
-      {/* ============ LEARNING + SERVICES TWO-COLUMN GRID ============ */}
-      <div className="grid-2">
-        <div>
-          <Section
-            eyebrow="Hindsight Insight"
-            title="Learned patterns"
-            description="How engineer feedback alters the agent's first investigation step."
-          >
-            {learn && learn.strategy.length > 0 ? (
-              <div className="stack-12">
-                <div className="feature memory-feature">
-                  <div className="feature-title">
-                    <Icon kind="sparkles" size={16} />
-                    Next investigation starts with
-                    <span className="chip highlight" style={{ fontSize: 13, padding: "4px 10px" }}>
-                      {learn.strategy[0].step}
-                    </span>
-                  </div>
-                  <p>{learn.strategy[0].reason ?? "No recorded rationale."}</p>
-                  <div className="keyval mt-8">
-                    <div className="keyval-row">
-                      <span className="keyval-key">First-choice count</span>
-                      <span className="keyval-val">{learn.strategy[0].first_choice_count}×</span>
-                    </div>
-                    <div className="keyval-row">
-                      <span className="keyval-key">Confirmed by engineers</span>
-                      <span className="keyval-val">
-                        {learn.strategy[0].engineer_confirmations}×
-                      </span>
-                    </div>
-                    <div className="keyval-row">
-                      <span className="keyval-key">Low-yield runs</span>
-                      <span className="keyval-val">{learn.strategy[0].low_yield_count}×</span>
-                    </div>
-                  </div>
-                  <div className="meta">computed from {learn.computed_from}</div>
-                </div>
+      <main>
+        <Hero />
+        <TrustStrip />
+        <HowItWorks />
+        <ProblemSolution />
+        <Capabilities />
+        <Evidence />
+        <Guardrails />
+        <Architecture />
+        <FinalCta />
+      </main>
 
-                {distribution.length > 0 && (
-                  <div>
-                    <div className="section-title" style={{ fontSize: 13, marginBottom: 8 }}>
-                      First-step distribution
-                    </div>
-                    <BarList data={distribution} />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <Empty title="No completed investigation runs yet">
-                Investigate an incident (e.g. INC-2001) to seed learning through the real pipeline.
-              </Empty>
-            )}
-          </Section>
-
-          <CounterCaseCard />
-        </div>
-
-        <div>
-          <Section
-            eyebrow="Services Catalog"
-            title="Services"
-            description="Services tracked and their learned recall priorities."
-          >
-            <div className="stack-8">
-              {stats.services.map((s) => (
-                <div className="card" key={s.service}>
-                  <div className="card-body" style={{ padding: "12px 16px" }}>
-                    <div className="row" style={{ justifyContent: "space-between" }}>
-                      <span className="mono" style={{ fontWeight: 650, fontSize: 14 }}>
-                        {s.service}
-                      </span>
-                      <Badge tone="neutral">
-                        {s.count} incident{s.count === 1 ? "" : "s"}
-                      </Badge>
-                    </div>
-                    <div className="faint mono" style={{ fontSize: 11.5, marginTop: 4 }}>
-                      {s.incident_ids.slice(0, 5).join(", ")}
-                      {s.incident_ids.length > 5 ? "…" : ""}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {stats.services.length === 0 && <Empty title="No services tracked yet" />}
-          </Section>
-
-          <Section
-            eyebrow="Hindsight Strategy"
-            title="Recall by service"
-            description="First check the agent executes per service."
-          >
-            {patterns.length > 0 ? (
-              <div className="card">
-                <div className="card-body" style={{ padding: "12px 16px" }}>
-                  <table className="data compact">
-                    <thead>
-                      <tr>
-                        <th>Service</th>
-                        <th>First check</th>
-                        <th>Runs</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {patterns.map((p) => (
-                        <tr key={`${p.service}->${p.first_step}`}>
-                          <td className="mono">{p.service}</td>
-                          <td>
-                            <span className="chip highlight">
-                              <span className="n">1</span>
-                              {p.first_step}
-                            </span>
-                          </td>
-                          <td className="muted">{p.count}×</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <Empty title="No service patterns learned yet" />
-            )}
-          </Section>
-        </div>
-      </div>
-
-      {/* ==================== DEMO MISSION CONTROL ==================== */}
-      <Section
-        id="demo"
-        eyebrow="Developer Tools"
-        title="Demo controls"
-        description="Reset, seed and replay the demo story through the real pipeline. Nothing here stubs the engine — feedback is retained to Hindsight for real."
-      >
-        <div className="card">
-          <div className="card-body">
-            <div className="row" style={{ gap: 12 }}>
-              <Button
-                size="small"
-                variant="ghost"
-                disabled={demoBusy !== null}
-                loading={demoBusy === "reset"}
-                onClick={() => void demoAction("reset")}
-              >
-                {demoBusy === "reset" ? "Resetting memory bank…" : "Reset memory bank"}
-              </Button>
-              <Button
-                size="small"
-                variant="ghost"
-                disabled={demoBusy !== null}
-                loading={demoBusy === "seed"}
-                onClick={() => void demoAction("seed")}
-              >
-                {demoBusy === "seed" ? "Seeding knowledge…" : "Seed tier-1 knowledge"}
-              </Button>
-              <Button
-                size="small"
-                variant="memory-btn"
-                disabled={demoBusy !== null}
-                loading={demoBusy === "replay"}
-                onClick={() => void demoAction("replay")}
-              >
-                {demoBusy === "replay" ? "Replaying history…" : "Replay scripted history"}
-              </Button>
-            </div>
-            <div className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>
-              Tier-1: general catalog knowledge. Replay: 3 scripted checkout incidents through the
-              real pipeline — labelled scripted feedback, retained to Hindsight for real.
-            </div>
-            {demoMsg && (
-              <div className="notice success mt-12" style={{ marginBottom: 0 }}>
-                <div>{demoMsg}</div>
-              </div>
-            )}
-            {error && incidents && (
-              <div className="notice error mt-12" style={{ marginBottom: 0 }}>
-                <div>{error}</div>
-              </div>
-            )}
-          </div>
-        </div>
-      </Section>
+      <Footer />
     </div>
   );
 }
