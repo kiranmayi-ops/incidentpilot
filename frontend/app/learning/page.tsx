@@ -1,13 +1,44 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   EngineAPI,
   type LearningEvolution,
   type LearningStrategy,
 } from "@/lib/api";
-import { pathToStepsLabel } from "@/lib/transforms";
-import { Empty, ErrorBox, Section, Spinner } from "../components";
+import {
+  beforeAfter,
+  firstStepDistribution,
+  fmtShortDate,
+  kindLabel,
+} from "@/lib/transforms";
+import {
+  Badge,
+  BarList,
+  ContextTag,
+  CounterCaseCard,
+  Empty,
+  ErrorBox,
+  Icon,
+  Section,
+  Spinner,
+  StepChips,
+} from "../components";
+
+const LOOP = [
+  { title: "Incident", desc: "Symptoms & live telemetry trigger investigation." },
+  { title: "Investigation", desc: "Agent walks investigation plan checking layers." },
+  { title: "Engineer Feedback", desc: "Engineer accepts or submits correction." },
+  { title: "Hindsight Memory", desc: "Experience narrative retained to memory bank." },
+  { title: "Future Investigation", desc: "Next recall incorporates past engineer lesson." },
+];
+
+const FEEDBACK_META: Record<string, { label: string; tone: "success" | "danger" | "warning" | "info" }> = {
+  accept: { label: "Accepted", tone: "success" },
+  reject: { label: "Rejected", tone: "danger" },
+  correct: { label: "Corrected", tone: "warning" },
+};
 
 export default function LearningPage() {
   const [evolution, setEvolution] = useState<LearningEvolution | null>(null);
@@ -32,90 +63,228 @@ export default function LearningPage() {
     void load();
   }, [load]);
 
-  if (error && !evolution) return <ErrorBox message={error} />;
-  if (!evolution || !strategy) return <Spinner />;
+  if (error && !evolution)
+    return (
+      <div>
+        <PageHeader />
+        <ErrorBox message={error} onRetry={() => void load()} />
+      </div>
+    );
+  if (!evolution || !strategy)
+    return (
+      <div>
+        <PageHeader />
+        <Spinner />
+      </div>
+    );
 
   const items = evolution.items;
+  const ba = beforeAfter(items);
+  const distribution = firstStepDistribution(items).slice(0, 6);
+  const totals = strategy.why?.["totals"];
 
   return (
     <div>
-      <h1>Learning evolution</h1>
-      <p className="sub">
-        Historical investigation paths and the CURRENT LEARNED STRATEGY — both computed from
-        real <span className="mono">investigation_runs</span> /{" "}
-        <span className="mono">investigation_steps</span> rows ({strategy.computed_from}) plus
-        today&apos;s Hindsight recall. Nothing here is static.
-      </p>
+      <PageHeader computedFrom={strategy.computed_from} />
 
-      <div className="two-col">
-        <Section title="CURRENT LEARNED STRATEGY">
-          {strategy.strategy.length === 0 ? (
-            <Empty title="No completed investigation runs yet. Investigate an incident (with memory) and confirm feedback to see the strategy evolve." />
-          ) : (
-            <ol style={{ margin: 0, paddingLeft: 18 }}>
-              {strategy.strategy.map((s) => (
-                <li key={s.step} style={{ margin: "6px 0" }}>
-                  <div className="mono">{s.step}</div>
-                  <div className="small muted">{s.reason}</div>
-                </li>
-              ))}
-            </ol>
+      {/* THE VISUAL LEARNING LOOP */}
+      <Section
+        eyebrow="Architecture Core"
+        title="The SRE Learning Loop"
+        description="How engineer corrections transform into long-term memory to optimize future investigations."
+      >
+        <div className="loop">
+          {LOOP.map((step, i) => (
+            <div className={`loop-step ${i === 3 || i === 4 ? "memory" : ""}`} key={step.title}>
+              <div className="loop-dot">{i + 1}</div>
+              <div className="loop-title">{step.title}</div>
+              <div className="loop-desc">{step.desc}</div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      {/* BEFORE VS AFTER STRATEGY */}
+      {ba && (
+        <Section
+          eyebrow="Strategy Shift"
+          title={`Incident ${ba.incident_id}: First step shift after learning`}
+          description="Comparison of the first check executed before and after Hindsight memory retention."
+        >
+          <div className="grid-2">
+            <div className="card">
+              <div className="card-body">
+                <div className="faint" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>BEFORE LEARNING</div>
+                <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginTop: 4 }}>
+                  {ba.before ?? "—"}
+                </div>
+                <div className="muted mt-4" style={{ fontSize: 12 }}>First check in baseline top-down strategy</div>
+              </div>
+            </div>
+            <div className="card" style={{ borderColor: "var(--memory-border)", borderLeft: "3px solid var(--memory-accent)" }}>
+              <div className="card-body">
+                <div className="faint" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--memory-text)" }}>AFTER LEARNING</div>
+                <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: "var(--memory-accent)", marginTop: 4 }}>
+                  {ba.after ?? "—"}
+                </div>
+                <div className="muted mt-4" style={{ fontSize: 12 }}>First check after Hindsight recalled past correction</div>
+              </div>
+            </div>
+          </div>
+          {ba.before && ba.after && ba.before !== ba.after && (
+            <div className="notice info mt-16" style={{ marginBottom: 0 }}>
+              <div>
+                <div className="notice-title">Investigation strategy adapted</div>
+                <p>
+                  When this symptom pattern recurs, the agent opens directly at{" "}
+                  <span className="mono" style={{ fontWeight: 700 }}>{ba.after}</span> instead of{" "}
+                  <span className="mono">{ba.before}</span> — saving critical response time.
+                </p>
+              </div>
+            </div>
           )}
         </Section>
+      )}
 
-        <Section title="WHY? (evidence)">
-          {strategy.strategy.length === 0 ? (
-            <Empty title="Evidence appears once runs are confirmed." />
-          ) : (
-            <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
-              <li>
-                {strategy.why?.["totals"]?.["completed_runs"] ?? 0} completed investigation
-                runs
-              </li>
-              <li>
-                {strategy.why?.["totals"]?.["retained_runs"] ?? 0} experiences retained to
-                Hindsight
-              </li>
-              <li>
-                {strategy.why?.["totals"]?.["engineer_confirmations"] ?? 0} engineer
-                confirmations
-              </li>
-              {strategy.strategy.map((s) => (
-                <li key={s.step}>
-                  {s.step}: first choice {s.first_choice_count}× · confirmed{" "}
-                  {s.engineer_confirmations}× · low-yield {s.low_yield_count}×
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
+      <div className="grid-2">
+        <div>
+          {/* CURRENT LEARNED STRATEGY */}
+          <Section
+            eyebrow={<ContextTag kind="memory" />}
+            title="Current Learned Strategy"
+            description="Recommended tool order for upcoming investigations."
+          >
+            {strategy.strategy.length === 0 ? (
+              <Empty title="No completed runs yet">
+                Investigate an incident and confirm engineer feedback to see the strategy evolve.
+              </Empty>
+            ) : (
+              <div className="stack-8">
+                {strategy.strategy.map((s, i) => (
+                  <div className="feature" key={s.step}>
+                    <div className="feature-title">
+                      <span className="chip highlight">
+                        <span className="n">{i + 1}</span>
+                        {s.step}
+                      </span>
+                    </div>
+                    <p>{s.reason ?? "No recorded rationale."}</p>
+                    <div className="keyval mt-8">
+                      <div className="keyval-row">
+                        <span className="keyval-key">Chosen first</span>
+                        <span className="keyval-val">{s.first_choice_count}×</span>
+                      </div>
+                      <div className="keyval-row">
+                        <span className="keyval-key">Confirmed by engineers</span>
+                        <span className="keyval-val">{s.engineer_confirmations}×</span>
+                      </div>
+                      <div className="keyval-row">
+                        <span className="keyval-key">Low-yield runs</span>
+                        <span className="keyval-val">{s.low_yield_count}×</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+        </div>
+
+        <div>
+          {/* EVIDENCE & METRICS */}
+          <Section
+            eyebrow={<ContextTag kind="now" />}
+            title="Empirical Run Evidence"
+            description="Metrics computed directly from PostgreSQL run history."
+          >
+            {strategy.strategy.length === 0 ? (
+              <Empty title="Evidence appears once runs complete." />
+            ) : (
+              <div className="stack-12">
+                <div className="card">
+                  <div className="card-body">
+                    <div className="keyval">
+                      <div className="keyval-row">
+                        <span className="keyval-key">Completed investigation runs</span>
+                        <span className="keyval-val">{totals?.completed_runs ?? 0}</span>
+                      </div>
+                      <div className="keyval-row">
+                        <span className="keyval-key">Experiences retained to Hindsight</span>
+                        <span className="keyval-val">{totals?.retained_runs ?? 0}</span>
+                      </div>
+                      <div className="keyval-row">
+                        <span className="keyval-key">Engineer confirmations</span>
+                        <span className="keyval-val">{totals?.engineer_confirmations ?? 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {distribution.length > 0 && (
+                  <div>
+                    <div className="section-title" style={{ fontSize: 13, marginBottom: 8 }}>
+                      First-Step Execution Distribution
+                    </div>
+                    <BarList data={distribution} />
+                  </div>
+                )}
+
+                <CounterCaseCard />
+              </div>
+            )}
+          </Section>
+        </div>
       </div>
 
-      <Section title="Investigation paths over time">
+      {/* PATHS OVER TIME */}
+      <Section
+        eyebrow="Historical Trajectory"
+        title="Investigation paths over time"
+        description="Chronological record of recorded investigation paths."
+      >
         {items.length === 0 ? (
           <Empty title="No runs recorded yet." />
         ) : (
-          items.map((it) => (
-            <div key={`${it.incident_id}-${it.created_at}`} className="arrow-step small">
-              <a
-                href={`/incidents/${it.incident_id}`}
-                className="mono"
-                style={{ color: "var(--accent)" }}
-              >
-                {it.incident_id}
-              </a>
-              <span className={it.path[0] === "check_redis" ? "step-degraded" : "muted"}>
-                [{pathToStepsLabel(it.kind)}]
-              </span>
-              <span className="muted">
-                {it.path.join(" → ")}
-                {it.feedback_kind ? ` · ${it.feedback_kind}` : ""}
-                {it.retained ? " · retained" : ""}
-              </span>
+          <div className="card">
+            <div className="card-body">
+              <div className="timeline">
+                {items.map((it, i) => {
+                  const fb = it.feedback_kind ? FEEDBACK_META[it.feedback_kind] : null;
+                  return (
+                    <div className="timeline-item" key={`${it.incident_id}-${it.created_at}`} style={{ animationDelay: `${Math.min(i * 50, 300)}ms` }}>
+                      <div className="timeline-marker neutral" />
+                      <div className="timeline-title">
+                        <Link href={`/incidents/${it.incident_id}`} className="mono" style={{ fontWeight: 700 }}>
+                          {it.incident_id}
+                        </Link>
+                        <Badge tone="neutral">{kindLabel(it.kind)}</Badge>
+                        {fb && <Badge tone={fb.tone}>{fb.label}</Badge>}
+                        {it.retained && <Badge tone="info">retained</Badge>}
+                      </div>
+                      <div className="timeline-meta">{fmtShortDate(it.created_at)}</div>
+                      <div className="timeline-body">
+                        <StepChips steps={it.path} highlightFirst />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          ))
+          </div>
         )}
       </Section>
     </div>
+  );
+}
+
+function PageHeader({ computedFrom }: { computedFrom?: string }) {
+  return (
+    <header className="page-header">
+      <div className="eyebrow">Insight</div>
+      <h1>Learning Evolution</h1>
+      <p className="lead">
+        Visualizing how engineer feedback becomes Hindsight long-term memory and changes future SRE investigation paths.
+      </p>
+    </header>
   );
 }

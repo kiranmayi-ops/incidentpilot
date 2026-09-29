@@ -37,6 +37,19 @@ describe("EngineAPI", () => {
     await expect(EngineAPI.health()).rejects.toThrow("500");
   });
 
+  it("returns structured health details when a dependency is degraded", async () => {
+    const health = {
+      status: "degraded",
+      database: { status: "ok" },
+      hindsight: { status: "unconfigured" },
+      demo_mode: true,
+      version: "0.1.0",
+    };
+    vi.stubGlobal("fetch", mockFetchOnce(503, { detail: health }));
+
+    await expect(EngineAPI.health()).resolves.toEqual(health);
+  });
+
   it.each([
     ["incidents", () => EngineAPI.incidents(), "/incidents"],
     ["timeline", () => EngineAPI.incidentTimeline("INC-1"), "/incidents/INC-1/timeline"],

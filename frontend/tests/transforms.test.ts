@@ -4,6 +4,12 @@ import {
   efficiencyFromEvolution,
   learnedOverview,
   pathToStepsLabel,
+  formatMetrics,
+  fmtShortDate,
+  incidentActivity,
+  firstStepDistribution,
+  beforeAfter,
+  servicePatterns,
   type DashboardStats,
 } from "@/lib/transforms";
 import type { Incident, LearningEvolutionItem, LearningStrategy } from "@/lib/api";
@@ -118,5 +124,111 @@ describe("pathToStepsLabel", () => {
     expect(pathToStepsLabel("memory")).toBe("memory plan");
     expect(pathToStepsLabel("live")).toBe("live plan");
     expect(pathToStepsLabel("replay")).toBe("scripted feedback");
+  });
+});
+
+describe("formatMetrics", () => {
+  it("labels, formats and tones known metrics from incident payloads", () => {
+    const views = formatMetrics({
+      latency_p99_ms: 1625,
+      error_rate_pct: 4.25,
+      throughput_rps: 1467,
+      db_connection_utilization: 0.9,
+      memory_utilization: 0.62,
+      queue_depth: 91,
+      replicas_restarted_last_1h: 0,
+    });
+    const byKey = Object.fromEntries(views.map((v) => [v.key, v]));
+    expect(byKey["latency_p99_ms"].value).toBe("1625 ms");
+    expect(byKey["latency_p99_ms"].tone).toBe("bad");
+    expect(byKey["error_rate_pct"].value).toBe("4%");
+    expect(byKey["error_rate_pct"].tone).toBe("warn");
+    expect(byKey["db_connection_utilization"].value).toBe("90%");
+    expect(byKey["db_connection_utilization"].tone).toBe("bad");
+    expect(byKey["memory_utilization"].value).toBe("62%");
+    expect(byKey["memory_utilization"].tone).toBeUndefined();
+    expect(byKey["replicas_restarted_last_1h"].tone).toBeUndefined();
+  });
+
+  it("ignores unknown metrics and handles non-numeric values", () => {
+    const views = formatMetrics({ mystery_field: 12, flag: "on" });
+    expect(views).toEqual([]);
+  });
+});
+
+describe("fmtShortDate", () => {
+  it("renders dates and passes through opaque strings", () => {
+    expect(fmtShortDate("2026-02-02T07:13:00Z")).toBe("2026-02-02");
+    expect(fmtShortDate("session")).toBe("session");
+    expect(fmtShortDate(null)).toBe("—");
+  });
+});
+
+const actIncidents = [inc("INC-2001", "checkout-api", "detected"), inc("INC-1001", "payment-api", "resolved")];
+
+describe("incidentActivity", () => {
+  it("maps the latest evolution entry per incident", () => {
+    const evolution = [
+      evo("INC-2001", ["check_redis", "check_database"], true),
+      evo("INC-1001", ["check_database"], false),
+    ];
+    const m = incidentActivity(actIncidents, evolution);
+    expect(m.get("INC-2001")).toEqual({
+      first_step: "check_redis",
+      feedback_kind: "accept",
+      retained: true,
+    });
+    expect(m.get("INC-1001")?.first_step).toBe("check_database");
+  });
+
+  it("reports no activity for incidents without runs", () => {
+    const m = incidentActivity([inc("INC-9", "s", "open")], []);
+    expect(m.get("INC-9")).toEqual({ first_step: null, feedback_kind: null, retained: null });
+  });
+});
+
+describe("firstStepDistribution", () => {
+  it("counts and sorts first steps descending", () => {
+    const d = firstStepDistribution([
+      evo("A", ["check_redis"], true),
+      evo("B", ["check_database"], true),
+      evo("C", ["check_redis"], false),
+    ]);
+    expect(d).toEqual([
+      { label: "check_redis", count: 2 },
+      { label: "check_database", count: 1 },
+    ]);
+  });
+});
+
+describe("beforeAfter", () => {
+  it("finds an incident with both a baseline and a memory run", () => {
+    const items = [
+      { ...evo("INC-2001", ["check_recent_deployments"], false), kind: "baseline", created_at: "2026-01-01T00:00:00Z" },
+      { ...evo("INC-2001", ["check_redis"], true), kind: "memory", created_at: "2026-01-02T00:00:00Z" },
+      { ...evo("INC-1001", ["check_database"], true), kind: "live", created_at: "2026-01-03T00:00:00Z" },
+    ];
+    expect(beforeAfter(items)).toEqual({
+      incident_id: "INC-2001",
+      before: "check_recent_deployments",
+      after: "check_redis",
+    });
+  });
+
+  it("returns null when no incident has both kinds", () => {
+    expect(beforeAfter([{ ...evo("A", ["x"], true), kind: "baseline" }])).toBeNull();
+    expect(beforeAfter([])).toBeNull();
+  });
+});
+
+describe("servicePatterns", () => {
+  it("groups first steps by service using the incident catalog", () => {
+    const patterns = servicePatterns(actIncidents, [
+      evo("INC-1001", ["check_database"], true),
+      evo("INC-2001", ["check_redis"], true),
+      evo("INC-2001", ["check_redis"], true),
+    ]);
+    expect(patterns[0]).toEqual({ service: "checkout-api", first_step: "check_redis", count: 2 });
+    expect(patterns[1]).toEqual({ service: "payment-api", first_step: "check_database", count: 1 });
   });
 });

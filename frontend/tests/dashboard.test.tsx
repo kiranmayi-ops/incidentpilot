@@ -98,6 +98,39 @@ describe("DashboardPage", () => {
     await screen.findByRole("heading", { name: "Incident dashboard" });
     const oks = await screen.findAllByText("ok");
     expect(oks.length).toBeGreaterThan(0);
-    expect(await screen.findByText("Hindsight")).toBeInTheDocument();
+    expect((await screen.findAllByText("Hindsight")).length).toBeGreaterThan(0);
+  });
+
+  it("renders when health reports a reachable but degraded backend", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string | URL | Request) =>
+        Promise.resolve(
+          String(url).endsWith("/health")
+            ? new Response(
+                JSON.stringify({
+                  detail: {
+                    status: "degraded",
+                    database: { status: "ok" },
+                    hindsight: { status: "unconfigured" },
+                    demo_mode: true,
+                    version: "0.1.0",
+                  },
+                }),
+                { status: 503, headers: { "Content-Type": "application/json" } },
+              )
+            : new Response(JSON.stringify(incBody(url)), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              }),
+        ),
+      ),
+    );
+
+    render(<DashboardPage />);
+
+    expect(await screen.findByRole("heading", { name: "Incident dashboard" })).toBeInTheDocument();
+    expect((await screen.findAllByText("unconfigured")).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Backend unreachable/)).not.toBeInTheDocument();
   });
 });

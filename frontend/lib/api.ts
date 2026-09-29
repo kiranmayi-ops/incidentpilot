@@ -12,7 +12,11 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  acceptDegradedHealth = false,
+): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     cache: "no-store",
@@ -22,6 +26,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
+    if (acceptDegradedHealth && res.status === 503) {
+      const body = (await res.json()) as { detail?: T };
+      if (body.detail && typeof body.detail === "object") return body.detail;
+    }
     let detail = `${res.status} ${res.statusText}`.trim() || `HTTP ${res.status}`;
     try {
       const body = (await res.json()) as { detail?: string };
@@ -175,6 +183,7 @@ export interface MemoryPanel {
   memories: RecalledMemory[];
   lessons: string[];
   stats: Record<string, unknown>;
+  note?: string | null;
 }
 
 export interface LearningEvolutionItem {
@@ -245,7 +254,7 @@ export interface DemoReplay {
 // ----------------------------------------------------------------- calls
 
 export const EngineAPI = {
-  health: () => request<Health>("/health"),
+  health: () => request<Health>("/health", undefined, true),
   incidents: (tier?: string) =>
     request<IncidentList>(tier ? `/incidents?tier=${encodeURIComponent(tier)}` : "/incidents"),
   incident: (id: string) => request<Incident>(`/incidents/${encodeURIComponent(id)}`),
