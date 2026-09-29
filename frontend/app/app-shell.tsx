@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { EngineAPI } from "../lib/api";
@@ -78,6 +78,43 @@ function ToggleIcon() {
   );
 }
 
+function SunIcon() {
+  return (
+    <svg
+      width={13}
+      height={13}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg
+      width={13}
+      height={13}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+    </svg>
+  );
+}
+
 /* ---------- Configuration ---------- */
 
 interface NavItem {
@@ -127,16 +164,79 @@ function useHealth() {
   return state;
 }
 
+/* ---------- Theme (data-theme on <html>; bootstrap set the initial value) --- */
+
+type Theme = "dark" | "light";
+
+function useTheme() {
+  const [theme, setTheme] = useState<Theme>("dark");
+
+  useEffect(() => {
+    const current = document.documentElement.dataset.theme;
+    setTheme(current === "light" ? "light" : "dark");
+  }, []);
+
+  const toggle = useCallback(() => {
+    setTheme((prev) => {
+      const next: Theme = prev === "dark" ? "light" : "dark";
+      document.documentElement.dataset.theme = next;
+      try {
+        window.localStorage?.setItem("ip.theme", next);
+      } catch {
+        /* private mode: persistence is best-effort */
+      }
+      return next;
+    });
+  }, []);
+
+  return { theme, toggle };
+}
+
 /* ---------- Shell ---------- */
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const health = useHealth();
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return window.innerWidth < 900;
-  });
+  const { theme, toggle: toggleTheme } = useTheme();
+  // Deterministic initial state (hydration-safe). The real viewport- and
+  // preference-aware value is applied right after mount; below 900px the CSS
+  // itself forces the collapsed rail regardless of JS state.
+  const [collapsed, setCollapsed] = useState<boolean>(false);
   const [hash, setHash] = useState<string>("");
+
+  const preferredCollapsed = useCallback(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage?.getItem("ip.sidebar") === "collapsed";
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Sync collapse state with viewport + saved preference after mount and on
+  // resize. Wide viewports honor the saved choice; narrow ones collapse.
+  useEffect(() => {
+    const sync = () => {
+      setCollapsed(window.innerWidth < 900 ? true : preferredCollapsed());
+    };
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
+  }, [preferredCollapsed]);
+
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      const next = !c;
+      if (typeof window !== "undefined" && window.innerWidth >= 900) {
+        try {
+          window.localStorage?.setItem("ip.sidebar", next ? "collapsed" : "expanded");
+        } catch {
+          /* private mode: persistence is best-effort */
+        }
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     const sync = () => setHash(window.location.hash);
@@ -144,14 +244,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.addEventListener("hashchange", sync);
     return () => window.removeEventListener("hashchange", sync);
   }, []);
-
-  useEffect(() => {
-    try {
-      window.localStorage?.setItem("ip.sidebar", collapsed ? "collapsed" : "expanded");
-    } catch {
-      /* private mode: persistence is best-effort */
-    }
-  }, [collapsed]);
 
   const dotClass =
     health.status === null
@@ -179,7 +271,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="sidebar" aria-label="Primary">
         <div className="sidebar-top">
           <Link href="/" className="brand" aria-label="IncidentPilot home">
-            <div className="brand-mark">IR</div>
+            <div className="brand-mark">IP</div>
             <div className="brand-text">
               <div className="brand-name">IncidentPilot</div>
               <div className="brand-tag">SRE Investigation</div>
@@ -190,7 +282,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="sidebar-toggle"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             aria-expanded={!collapsed}
-            onClick={() => setCollapsed((c) => !c)}
+            onClick={toggleCollapsed}
           >
             <span className={`toggle-ic${collapsed ? " flip" : ""}`}>
               <ToggleIcon />
@@ -220,6 +312,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="sidebar-bottom">
+          <button
+            type="button"
+            className="theme-toggle"
+            style={{
+              width: "100%",
+              height: "auto",
+              borderRadius: 8,
+              padding: "7px 0",
+              justifyContent: "center",
+              gap: 8,
+              marginBottom: 10,
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+            aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            title={theme === "dark" ? "Light mode" : "Dark mode"}
+            onClick={toggleTheme}
+          >
+            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+            {!collapsed && <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>}
+          </button>
           <div className="status-pill" title={statusLabel}>
             <span className={`status-dot ${dotClass}`} />
             <div className="status-text">

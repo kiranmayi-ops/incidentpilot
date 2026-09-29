@@ -15,11 +15,13 @@ import {
   CounterCaseCard,
   Empty,
   ErrorBox,
+  Hero,
   Icon,
   Notice,
   Spinner,
   StepChips,
   StatusBadge,
+  Verdict,
 } from "../components";
 
 type Side = InvestigateResponse | null;
@@ -42,13 +44,17 @@ function Panel({
   return (
     <div className={`compare-panel ${active ? "active-memory" : ""}`}>
       <div className="compare-panel-head">
-        <span className="panel-title" style={{ fontWeight: 650, fontSize: 14 }}>{title}</span>
+        <span className="panel-title" style={{ fontSize: 14 }}>
+          {title}
+        </span>
         <ContextTag kind={active ? "memory" : "now"} />
       </div>
       <div className="compare-panel-body">
         {!side ? (
           <Empty title="Not run yet">
-            {active ? 'Click "Run with Hindsight" to recall long-term memory.' : 'Click "Run baseline" (recall disabled).'}
+            {active
+              ? 'Click "Run with Hindsight" to recall long-term memory.'
+              : 'Click "Run baseline" (recall disabled).'}
           </Empty>
         ) : (
           <div className="stack-12 reveal" key={`run-${side.run_id}`}>
@@ -57,7 +63,9 @@ function Panel({
               <Badge tone="neutral">{kindLabel(side.kind)}</Badge>
               <StatusBadge status={side.status} />
               {side.used_fallback ? (
-                <Badge tone="warning" dot>fallback strategy</Badge>
+                <Badge tone="warning" dot>
+                  fallback strategy
+                </Badge>
               ) : (
                 <Badge tone="neutral">live LLM</Badge>
               )}
@@ -65,10 +73,14 @@ function Panel({
 
             {/* FIRST STEP FOCUS */}
             <div className={`first-step-highlight ${highlightFirst ? "changed" : ""}`}>
-              <div className="label">{active ? "Memory-Informed First Step" : "Baseline First Step"}</div>
+              <div className="label">
+                {active ? "Memory-informed first step" : "Baseline first step"}
+              </div>
               <div className="mono-big">{firstStep(side.strategy) ?? "—"}</div>
               <div className="faint" style={{ fontSize: 11.5, marginTop: 4 }}>
-                {active ? "Guided by recalled investigation history" : "Default top-down evidence order"}
+                {active
+                  ? "Guided by recalled investigation history"
+                  : "Default top-down evidence order"}
               </div>
             </div>
 
@@ -81,7 +93,7 @@ function Panel({
 
             <div>
               <div className="section-title" style={{ fontSize: 12.5, marginBottom: 6 }}>
-                Memory Recall Status
+                Memory recall status
               </div>
               <div className="stack-8">
                 <div className="row">
@@ -89,26 +101,45 @@ function Panel({
                     {side.recall.count} recalled memory snippet{side.recall.count === 1 ? "" : "s"}
                   </Badge>
                   {side.recall.memory_ready ? (
-                    <Badge tone="info" dot>memory ready</Badge>
+                    <Badge tone="info" dot>
+                      memory ready
+                    </Badge>
                   ) : (
-                    <Badge tone="warning" dot>not ready</Badge>
+                    <Badge tone="warning" dot>
+                      not ready
+                    </Badge>
                   )}
                 </div>
                 {side.recall.incident_ids.length > 0 && (
                   <div>
-                    <div className="faint" style={{ fontSize: 11.5, marginBottom: 4 }}>Evidenced by Incident IDs:</div>
+                    <div className="faint" style={{ fontSize: 11.5, marginBottom: 4 }}>
+                      Evidenced by incident IDs:
+                    </div>
                     <div className="chips">
                       {side.recall.incident_ids.slice(0, 8).map((iid) => (
-                        <span key={iid} className="chip highlight">{iid}</span>
+                        <span key={iid} className="chip highlight">
+                          {iid}
+                        </span>
                       ))}
                       {side.recall.incident_ids.length > 8 && (
-                        <span className="chip ghost">+{side.recall.incident_ids.length - 8}</span>
+                        <span className="chip ghost">
+                          +{side.recall.incident_ids.length - 8}
+                        </span>
                       )}
                     </div>
                   </div>
                 )}
                 {side.memory_summary && (
-                  <div style={{ fontSize: 12.5, color: "var(--text-secondary)", background: "var(--bg-subtle)", border: "1px solid var(--border)", borderRadius: 6, padding: "8px 12px" }}>
+                  <div
+                    style={{
+                      fontSize: 12.5,
+                      color: "var(--text-secondary)",
+                      background: "var(--surface-hover)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      padding: "8px 12px",
+                    }}
+                  >
                     {side.memory_summary}
                   </div>
                 )}
@@ -118,7 +149,7 @@ function Panel({
             {side.steps.length > 0 && (
               <div>
                 <div className="section-title" style={{ fontSize: 12.5, marginBottom: 6 }}>
-                  Executed Tool Steps
+                  Executed tool steps
                 </div>
                 <div className="chips">
                   {side.steps.map((s) => (
@@ -137,10 +168,13 @@ function Panel({
             {side.root_cause_candidate && (
               <div className="feature" style={{ marginTop: 8 }}>
                 <div className="feature-title">
-                  Proposed Root Cause ·{" "}
+                  <Icon kind="investigate" size={14} />
+                  Proposed root cause ·
                   <span className="mono">{String(side.root_cause_candidate.layer)}</span>
                 </div>
-                <p style={{ fontWeight: 500 }}>{String(side.root_cause_candidate.root_cause)}</p>
+                <p style={{ fontWeight: 500 }}>
+                  {String(side.root_cause_candidate.root_cause)}
+                </p>
               </div>
             )}
           </div>
@@ -199,14 +233,25 @@ export default function ComparePage() {
   if (error && !incidents)
     return (
       <div>
-        <PageHeader />
+        <Hero
+          eyebrow="Hero Interaction"
+          title="Baseline"
+          highlight="vs Memory"
+          sub="Compare how the SRE investigation agent operates before and after recalling long-term memories from Hindsight."
+        />
         <ErrorBox message={error} onRetry={() => void load()} />
       </div>
     );
+
   if (!incidents)
     return (
       <div>
-        <PageHeader />
+        <Hero
+          eyebrow="Hero Interaction"
+          title="Baseline"
+          highlight="vs Memory"
+          sub="Compare how the SRE investigation agent operates before and after recalling long-term memories from Hindsight."
+        />
         <Spinner />
       </div>
     );
@@ -219,12 +264,39 @@ export default function ComparePage() {
 
   return (
     <div>
-      <PageHeader />
+      <Hero
+        eyebrow="Hero Interaction"
+        title="Baseline"
+        highlight="vs Memory"
+        sub="The same incident, the same agent — with and without long-term memory. Real execution data straight from the engine pipeline."
+        actions={
+          <div className="row" style={{ gap: 10 }}>
+            <Button
+              variant="secondary"
+              disabled={busyKind !== null}
+              loading={busyKind === "baseline"}
+              onClick={() => void run("baseline")}
+            >
+              {busyKind === "baseline" ? "Running Baseline…" : "Run Baseline (No Memory)"}
+            </Button>
+            <Button
+              variant="memory-btn"
+              disabled={busyKind !== null}
+              loading={busyKind === "memory"}
+              onClick={() => void run("memory")}
+            >
+              {busyKind === "memory" ? "Running with Hindsight…" : "Run with Hindsight"}
+            </Button>
+          </div>
+        }
+      />
 
-      {/* Incident Selection & Trigger Toolbar */}
-      <div className="compare-toolbar">
-        <div className="compare-toolbar-field">
-          <label className="field-label" htmlFor="incident-select">Target Incident</label>
+      {/* Incident selector */}
+      <div className="filter-bar" style={{ marginBottom: 20 }}>
+        <div className="filter-input" style={{ maxWidth: 560 }}>
+          <label className="field-label" htmlFor="incident-select">
+            Target Incident
+          </label>
           <select
             id="incident-select"
             className="input"
@@ -244,40 +316,33 @@ export default function ComparePage() {
           </select>
           {selectedIncidentObj && (
             <div className="muted mt-8" style={{ fontSize: 12.5 }}>
-              <span className="mono" style={{ color: "var(--text)" }}>{selectedIncidentObj.service}</span>{" "}
+              <span className="mono" style={{ color: "var(--text)" }}>
+                {selectedIncidentObj.service}
+              </span>{" "}
               · {selectedIncidentObj.symptoms[0]}
             </div>
           )}
         </div>
-
-        <div className="compare-toolbar-actions">
-          <Button
-            variant="secondary"
-            disabled={busyKind !== null}
-            loading={busyKind === "baseline"}
-            onClick={() => void run("baseline")}
-          >
-            {busyKind === "baseline" ? "Running Baseline…" : "Run Baseline (No Memory)"}
-          </Button>
-          <Button
-            variant="memory-btn"
-            disabled={busyKind !== null}
-            loading={busyKind === "memory"}
-            onClick={() => void run("memory")}
-          >
-            {busyKind === "memory" ? "Running with Hindsight…" : "Run with Hindsight"}
-          </Button>
-        </div>
       </div>
 
-      {/* Memory Recall Sequence Animation Toast */}
+      {/* Recall sequence toast */}
       {recallStage && (
         <div className="notice info mb-24">
           <div className="row" style={{ gap: 10 }}>
-            <span className="spin" style={{ borderColor: "var(--memory-accent)", borderTopColor: "transparent" }} />
+            <span
+              className="spin"
+              style={{
+                borderColor: "var(--memory-accent)",
+                borderTopColor: "transparent",
+              }}
+            />
             <div>
-              <div className="notice-title" style={{ color: "var(--memory-text)" }}>Memory Recall Sequence</div>
-              <div className="mono" style={{ fontSize: 12.5 }}>{recallStage}</div>
+              <div className="notice-title" style={{ color: "var(--memory-text)" }}>
+                Memory Recall Sequence
+              </div>
+              <div className="mono" style={{ fontSize: 12.5 }}>
+                {recallStage}
+              </div>
             </div>
           </div>
         </div>
@@ -285,58 +350,30 @@ export default function ComparePage() {
 
       {error ? <ErrorBox message={error} /> : null}
 
-      {/* Outcome Highlight Banners */}
-      {changed ? (
-        <Notice tone="success" title="FIRST STEP CHANGED — Long-term memory altered investigation order">
-          <p>
-            Baseline opened at <span className="mono" style={{ fontWeight: 700 }}>{before}</span>. The memory-informed agent opened at <span className="mono" style={{ fontWeight: 700 }}>{after}</span>. This shift occurs because Hindsight recalled prior engineer corrections for this symptom pattern.
-          </p>
-        </Notice>
-      ) : baseline && memoryRun ? (
-        <Notice tone="info" title="NO STRATEGY CHANGE for this incident">
-          <p>
-            Both runs opened with <span className="mono">{before}</span>. To experience the memory shift, run <span className="mono">/demo/replay</span> on the dashboard and select <span className="mono">INC-2001</span>.
-          </p>
-        </Notice>
-      ) : null}
+      {/* Verdict banner */}
+      {baseline && memoryRun && <Verdict changed={changed} before={before} after={after} />}
 
-      {/* Side-by-side Comparison Areas */}
-      <div className="compare-grid">
-        <div>
-          <Panel
-            title="BASELINE"
-            tag="No long-term memory"
-            active={false}
-            side={baseline}
-          />
+      {/* Side-by-side VS layout */}
+      <div className="vs-wrap" style={{ marginBottom: 24 }}>
+        <Panel
+          title="BASELINE"
+          tag="No long-term memory"
+          active={false}
+          side={baseline}
+        />
+        <div className="vs-spine" aria-hidden>
+          <span className="vs-badge">VS</span>
         </div>
-        <div>
-          <Panel
-            title="WITH HINDSIGHT"
-            tag="Long-term memory enabled"
-            active
-            side={memoryRun}
-            highlightFirst={changed}
-          />
-        </div>
+        <Panel
+          title="WITH HINDSIGHT"
+          tag="Long-term memory enabled"
+          active
+          side={memoryRun}
+          highlightFirst={changed}
+        />
       </div>
 
-      {/* Counter-case Interactive Concept Block */}
-      <div className="mt-24">
-        <CounterCaseCard />
-      </div>
+      <CounterCaseCard />
     </div>
-  );
-}
-
-function PageHeader() {
-  return (
-    <header className="page-header">
-      <div className="eyebrow">Hero Interaction</div>
-      <h1>Baseline vs Memory</h1>
-      <p className="lead">
-        Compare how the SRE investigation agent operates before and after recalling long-term memories from Hindsight. Real execution data straight from the engine pipeline.
-      </p>
-    </header>
   );
 }

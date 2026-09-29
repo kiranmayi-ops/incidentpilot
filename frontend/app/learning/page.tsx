@@ -20,6 +20,7 @@ import {
   CounterCaseCard,
   Empty,
   ErrorBox,
+  Hero,
   Icon,
   Section,
   Spinner,
@@ -27,14 +28,29 @@ import {
 } from "../components";
 
 const LOOP = [
-  { title: "Incident", desc: "Symptoms & live telemetry trigger investigation." },
-  { title: "Investigation", desc: "Agent walks investigation plan checking layers." },
-  { title: "Engineer Feedback", desc: "Engineer accepts or submits correction." },
-  { title: "Hindsight Memory", desc: "Experience narrative retained to memory bank." },
-  { title: "Future Investigation", desc: "Next recall incorporates past engineer lesson." },
+  {
+    title: "Incident",
+    desc: "Symptoms & live telemetry trigger investigation.",
+    tone: "evidence" as const,
+  },
+  { title: "Investigation", desc: "Agent walks the plan, checking layers.", tone: undefined },
+  { title: "Engineer Feedback", desc: "Engineer accepts or submits a correction.", tone: undefined },
+  {
+    title: "Hindsight Memory",
+    desc: "Experience narrative retained to the memory bank.",
+    tone: "memory" as const,
+  },
+  {
+    title: "Future Investigation",
+    desc: "Next recall incorporates the past lesson.",
+    tone: "memory" as const,
+  },
 ];
 
-const FEEDBACK_META: Record<string, { label: string; tone: "success" | "danger" | "warning" | "info" }> = {
+const FEEDBACK_META: Record<
+  string,
+  { label: string; tone: "success" | "danger" | "warning" | "info" }
+> = {
   accept: { label: "Accepted", tone: "success" },
   reject: { label: "Rejected", tone: "danger" },
   correct: { label: "Corrected", tone: "warning" },
@@ -66,14 +82,25 @@ export default function LearningPage() {
   if (error && !evolution)
     return (
       <div>
-        <PageHeader />
+        <Hero
+          eyebrow="Insight"
+          title="Learning"
+          highlight="evolution"
+          sub="How engineer feedback becomes Hindsight long-term memory and changes future SRE investigation paths."
+        />
         <ErrorBox message={error} onRetry={() => void load()} />
       </div>
     );
+
   if (!evolution || !strategy)
     return (
       <div>
-        <PageHeader />
+        <Hero
+          eyebrow="Insight"
+          title="Learning"
+          highlight="evolution"
+          sub="How engineer feedback becomes Hindsight long-term memory and changes future SRE investigation paths."
+        />
         <Spinner />
       </div>
     );
@@ -85,9 +112,14 @@ export default function LearningPage() {
 
   return (
     <div>
-      <PageHeader computedFrom={strategy.computed_from} />
+      <Hero
+        eyebrow="Insight"
+        title="Learning"
+        highlight="evolution"
+        sub="How engineer feedback becomes Hindsight long-term memory and changes future SRE investigation paths."
+      />
 
-      {/* THE VISUAL LEARNING LOOP */}
+      {/* ==================== THE LEARNING LOOP ==================== */}
       <Section
         eyebrow="Architecture Core"
         title="The SRE Learning Loop"
@@ -95,39 +127,84 @@ export default function LearningPage() {
       >
         <div className="loop">
           {LOOP.map((step, i) => (
-            <div className={`loop-step ${i === 3 || i === 4 ? "memory" : ""}`} key={step.title}>
+            <div
+              className={`loop-step ${step.tone ?? ""}`}
+              key={step.title}
+            >
               <div className="loop-dot">{i + 1}</div>
               <div className="loop-title">{step.title}</div>
               <div className="loop-desc">{step.desc}</div>
+              <div className="loop-link" />
             </div>
           ))}
         </div>
       </Section>
 
-      {/* BEFORE VS AFTER STRATEGY */}
+      {/* ==================== STRATEGY SHIFT ==================== */}
       {ba && (
         <Section
           eyebrow="Strategy Shift"
-          title={`Incident ${ba.incident_id}: First step shift after learning`}
+          title={`Incident ${ba.incident_id}: first step shift after learning`}
           description="Comparison of the first check executed before and after Hindsight memory retention."
         >
           <div className="grid-2">
             <div className="card">
               <div className="card-body">
-                <div className="faint" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>BEFORE LEARNING</div>
-                <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", marginTop: 4 }}>
+                <div
+                  className="faint"
+                  style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}
+                >
+                  Before learning
+                </div>
+                <div
+                  className="mono"
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 700,
+                    color: "var(--text)",
+                    marginTop: 4,
+                  }}
+                >
                   {ba.before ?? "—"}
                 </div>
-                <div className="muted mt-4" style={{ fontSize: 12 }}>First check in baseline top-down strategy</div>
+                <div className="muted mt-4" style={{ fontSize: 12 }}>
+                  First check in baseline top-down strategy
+                </div>
               </div>
             </div>
-            <div className="card" style={{ borderColor: "var(--memory-border)", borderLeft: "3px solid var(--memory-accent)" }}>
+            <div
+              className="card"
+              style={{
+                borderColor: "var(--memory-border)",
+                borderLeft: "3px solid var(--memory-accent)",
+              }}
+            >
               <div className="card-body">
-                <div className="faint" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "var(--memory-text)" }}>AFTER LEARNING</div>
-                <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: "var(--memory-accent)", marginTop: 4 }}>
+                <div
+                  className="faint"
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    color: "var(--memory-text)",
+                  }}
+                >
+                  After learning
+                </div>
+                <div
+                  className="mono"
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 700,
+                    color: "var(--memory-text)",
+                    marginTop: 4,
+                  }}
+                >
                   {ba.after ?? "—"}
                 </div>
-                <div className="muted mt-4" style={{ fontSize: 12 }}>First check after Hindsight recalled past correction</div>
+                <div className="muted mt-4" style={{ fontSize: 12 }}>
+                  First check after Hindsight recalled a past correction
+                </div>
               </div>
             </div>
           </div>
@@ -137,8 +214,11 @@ export default function LearningPage() {
                 <div className="notice-title">Investigation strategy adapted</div>
                 <p>
                   When this symptom pattern recurs, the agent opens directly at{" "}
-                  <span className="mono" style={{ fontWeight: 700 }}>{ba.after}</span> instead of{" "}
-                  <span className="mono">{ba.before}</span> — saving critical response time.
+                  <span className="mono" style={{ fontWeight: 700 }}>
+                    {ba.after}
+                  </span>{" "}
+                  instead of <span className="mono">{ba.before}</span> — saving critical response
+                  time.
                 </p>
               </div>
             </div>
@@ -148,7 +228,7 @@ export default function LearningPage() {
 
       <div className="grid-2">
         <div>
-          {/* CURRENT LEARNED STRATEGY */}
+          {/* ==================== LEARNED STRATEGY ==================== */}
           <Section
             eyebrow={<ContextTag kind="memory" />}
             title="Current Learned Strategy"
@@ -191,7 +271,7 @@ export default function LearningPage() {
         </div>
 
         <div>
-          {/* EVIDENCE & METRICS */}
+          {/* ==================== EMPIRICAL EVIDENCE ==================== */}
           <Section
             eyebrow={<ContextTag kind="now" />}
             title="Empirical Run Evidence"
@@ -223,7 +303,7 @@ export default function LearningPage() {
                 {distribution.length > 0 && (
                   <div>
                     <div className="section-title" style={{ fontSize: 13, marginBottom: 8 }}>
-                      First-Step Execution Distribution
+                      First-step execution distribution
                     </div>
                     <BarList data={distribution} />
                   </div>
@@ -236,7 +316,7 @@ export default function LearningPage() {
         </div>
       </div>
 
-      {/* PATHS OVER TIME */}
+      {/* ==================== PATHS OVER TIME ==================== */}
       <Section
         eyebrow="Historical Trajectory"
         title="Investigation paths over time"
@@ -251,10 +331,18 @@ export default function LearningPage() {
                 {items.map((it, i) => {
                   const fb = it.feedback_kind ? FEEDBACK_META[it.feedback_kind] : null;
                   return (
-                    <div className="timeline-item" key={`${it.incident_id}-${it.created_at}`} style={{ animationDelay: `${Math.min(i * 50, 300)}ms` }}>
+                    <div
+                      className="timeline-item"
+                      key={`${it.incident_id}-${it.created_at}`}
+                      style={{ animationDelay: `${Math.min(i * 50, 300)}ms` }}
+                    >
                       <div className="timeline-marker neutral" />
                       <div className="timeline-title">
-                        <Link href={`/incidents/${it.incident_id}`} className="mono" style={{ fontWeight: 700 }}>
+                        <Link
+                          href={`/incidents/${it.incident_id}`}
+                          className="mono"
+                          style={{ fontWeight: 700 }}
+                        >
                           {it.incident_id}
                         </Link>
                         <Badge tone="neutral">{kindLabel(it.kind)}</Badge>
@@ -274,17 +362,5 @@ export default function LearningPage() {
         )}
       </Section>
     </div>
-  );
-}
-
-function PageHeader({ computedFrom }: { computedFrom?: string }) {
-  return (
-    <header className="page-header">
-      <div className="eyebrow">Insight</div>
-      <h1>Learning Evolution</h1>
-      <p className="lead">
-        Visualizing how engineer feedback becomes Hindsight long-term memory and changes future SRE investigation paths.
-      </p>
-    </header>
   );
 }

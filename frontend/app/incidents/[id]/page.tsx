@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   EngineAPI,
@@ -20,6 +21,7 @@ import {
   Empty,
   ErrorBox,
   FactRow,
+  Hero,
   Icon,
   MemoryCard,
   Metric,
@@ -32,7 +34,10 @@ import {
   TierBadge,
 } from "../../components";
 
-const FEEDBACK_META: Record<string, { label: string; tone: "success" | "danger" | "warning" | "info" }> = {
+const FEEDBACK_META: Record<
+  string,
+  { label: string; tone: "success" | "danger" | "warning" | "info" }
+> = {
   accept: { label: "Accepted", tone: "success" },
   reject: { label: "Rejected", tone: "danger" },
   correct: { label: "Corrected", tone: "warning" },
@@ -142,10 +147,20 @@ export default function IncidentPage() {
     }
   }
 
+  const metrics = useMemo(
+    () => (incident ? formatMetrics(incident.metrics ?? {}) : []),
+    [incident],
+  );
+
   if (!incident)
     return (
       <div>
-        <PageHeader id={id} incident={null} />
+        <Hero
+          eyebrow="Investigation Workspace"
+          title={<span className="mono">{id}</span>}
+          sub="Loading incident workspace…"
+          actions={<Link href="/" className="btn ghost small">← Back to dashboard</Link>}
+        />
         {error ? <ErrorBox message={error} onRetry={() => void loadDetail()} /> : <Spinner />}
       </div>
     );
@@ -155,17 +170,41 @@ export default function IncidentPage() {
   const canFeedback = active?.status === "feedback";
   const canResolve = active?.status === "feedback" || active?.status === "completed";
   const feedbackMeta = active?.feedback_kind ? FEEDBACK_META[active.feedback_kind] : null;
-  const metrics = formatMetrics(incident.metrics ?? {});
 
   return (
     <div>
-      <PageHeader id={id} incident={incident} />
+      {/* ============================== HEADER ============================== */}
+      <Hero
+        eyebrow={
+          <span className="row" style={{ gap: 8 }}>
+            <ContextTag kind="now" />
+            <ContextTag kind="memory" />
+          </span>
+        }
+        title={
+          <>
+            <span className="mono" style={{ color: "var(--accent)" }}>{id}</span>
+            {" · "}
+            {incident.symptoms[0] ?? "Investigation workspace"}
+          </>
+        }
+        sub={`${incident.service} (${incident.environment}) · opened ${fmtShortDate(incident.timestamp)} — evidence on the left, recalled memory on the right.`}
+        stats={undefined}
+        actions={
+          <div className="row" style={{ gap: 8 }}>
+            <SeverityBadge severity={incident.severity} />
+            <TierBadge tier={incident.tier} />
+            <StatusBadge status={incident.status} />
+            <Badge tone="ghost">{incident.service}</Badge>
+          </div>
+        }
+      />
 
       {error ? <ErrorBox message={error} /> : null}
       {notice ? <Notice tone="success" title={notice} /> : null}
 
       <div className="detail-grid">
-        {/* LEFT COLUMN: CURRENT EVIDENCE & INVESTIGATION TIMELINE */}
+        {/* ==================== LEFT: EVIDENCE + TIMELINE ==================== */}
         <div>
           {/* ---------- CURRENT EVIDENCE ---------- */}
           <Section
@@ -176,7 +215,12 @@ export default function IncidentPage() {
             <div className="card">
               <div className="card-body stack-12">
                 <div>
-                  <div className="field-label" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em" }}>Reported Symptoms</div>
+                  <div
+                    className="field-label"
+                    style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em" }}
+                  >
+                    Reported Symptoms
+                  </div>
                   <ul style={{ margin: "4px 0 0", paddingLeft: 18, color: "var(--text)" }}>
                     {incident.symptoms.map((s) => (
                       <li key={s} style={{ fontSize: 14, fontWeight: 500, marginBottom: 2 }}>
@@ -188,19 +232,48 @@ export default function IncidentPage() {
 
                 {metrics.length > 0 && (
                   <div>
-                    <div className="field-label" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Telemetry Snapshot</div>
-                    <div className="row" style={{ gap: 10 }}>
-                      {metrics.map((m) => (
-                        <Metric key={m.key} label={m.label} value={m.value} tone={m.tone} />
-                      ))}
+                    <div
+                      className="field-label"
+                      style={{
+                        fontSize: 11,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        marginBottom: 8,
+                      }}
+                    >
+                      Telemetry Snapshot
+                    </div>
+                    <div className="metric-cards">
+                      {metrics.map((m) =>
+                        m.key.endsWith("utilization") ? (
+                          <Metric
+                            key={m.key}
+                            label={m.label}
+                            value={m.value}
+                            tone={m.tone}
+                            pct={
+                              Number.isFinite(parseFloat(m.value))
+                                ? parseFloat(m.value)
+                                : undefined
+                            }
+                          />
+                        ) : (
+                          <Metric key={m.key} label={m.label} value={m.value} tone={m.tone} />
+                        ),
+                      )}
                     </div>
                   </div>
                 )}
 
                 {incident.root_cause && (
-                  <div className="feature" style={{ background: "var(--bg-subtle)" }}>
-                    <div className="feature-title">Ground-truth root cause</div>
-                    <p className="mono" style={{ fontWeight: 650 }}>{incident.root_cause}</p>
+                  <div className="feature" style={{ background: "var(--surface-hover)" }}>
+                    <div className="feature-title">
+                      <Icon kind="investigate" size={14} />
+                      Ground-truth root cause
+                    </div>
+                    <p className="mono" style={{ fontWeight: 650 }}>
+                      {incident.root_cause}
+                    </p>
                     {incident.lesson && <div className="meta">Lesson: {incident.lesson}</div>}
                   </div>
                 )}
@@ -219,7 +292,9 @@ export default function IncidentPage() {
                   <Button
                     key={kind}
                     size="small"
-                    variant={kind === "memory" ? "memory-btn" : kind === "baseline" ? "secondary" : "ghost"}
+                    variant={
+                      kind === "memory" ? "memory-btn" : kind === "baseline" ? "secondary" : "ghost"
+                    }
                     disabled={busyAction !== null}
                     loading={busyAction === `run:${kind}`}
                     onClick={() => void runInvestigation(kind)}
@@ -241,9 +316,15 @@ export default function IncidentPage() {
                     <Badge tone="info">Run #{active.id}</Badge>
                     <Badge tone="neutral">{kindLabel(active.kind)}</Badge>
                     <StatusBadge status={active.status} />
-                    {active.memory_ready && <Badge tone="info" dot>memory ready</Badge>}
+                    {active.memory_ready && (
+                      <Badge tone="info" dot>
+                        memory ready
+                      </Badge>
+                    )}
                     {active.used_fallback ? (
-                      <Badge tone="warning" dot>fallback strategy</Badge>
+                      <Badge tone="warning" dot>
+                        fallback strategy
+                      </Badge>
                     ) : (
                       active.engine && <Badge tone="neutral">live LLM</Badge>
                     )}
@@ -257,7 +338,8 @@ export default function IncidentPage() {
                   {active.used_fallback && (
                     <Notice tone="warn" title="Fallback strategy applied">
                       <p>
-                        The tool order was generated by memory-driven fallback scoring because the primary LLM provider was unavailable. Results remain empirical.
+                        The tool order was generated by memory-driven fallback scoring because the
+                        primary LLM provider was unavailable. Results remain empirical.
                       </p>
                     </Notice>
                   )}
@@ -279,7 +361,11 @@ export default function IncidentPage() {
 
                     {/* Step 01: Investigation Plan */}
                     <div className="timeline-item">
-                      <div className={`timeline-marker ${active.kind === "memory" ? "memory" : "neutral"}`}>01</div>
+                      <div
+                        className={`timeline-marker ${active.kind === "memory" ? "memory" : "neutral"}`}
+                      >
+                        01
+                      </div>
                       <div className="timeline-title">
                         <span>Investigation plan</span>
                         <Badge tone={active.kind === "memory" ? "info" : "neutral"}>
@@ -287,7 +373,11 @@ export default function IncidentPage() {
                         </Badge>
                       </div>
                       <div className="timeline-meta">
-                        Agent selected tool execution sequence based on {active.kind === "memory" ? "recalled Hindsight memories + live evidence" : "generic evidence ranking"}.
+                        Agent selected tool execution sequence based on{" "}
+                        {active.kind === "memory"
+                          ? "recalled Hindsight memories + live evidence"
+                          : "generic evidence ranking"}
+                        .
                       </div>
                       <div className="timeline-body">
                         <StepChips steps={active.strategy} highlightFirst />
@@ -298,22 +388,44 @@ export default function IncidentPage() {
                     {steps.map((s, i) => {
                       const stepNum = String(i + 2).padStart(2, "0");
                       return (
-                        <div className="timeline-item" key={s.id} style={{ animationDelay: `${i * 60}ms` }}>
+                        <div
+                          className="timeline-item"
+                          key={s.id}
+                          style={{ animationDelay: `${i * 60}ms` }}
+                        >
                           <div className={`timeline-marker ${stepMarker(s.result_status)}`}>
                             {stepNum}
                           </div>
                           <div className="timeline-title">
-                            <span className="mono" style={{ fontWeight: 700 }}>{s.tool}</span>
+                            <span className="mono" style={{ fontWeight: 700 }}>
+                              {s.tool}
+                            </span>
                             <Badge
-                              tone={s.result_status === "degraded" ? "danger" : s.result_status === "unknown" ? "warning" : "success"}
+                              tone={
+                                s.result_status === "degraded"
+                                  ? "danger"
+                                  : s.result_status === "unknown"
+                                    ? "warning"
+                                    : "success"
+                              }
                               dot
                             >
-                              {s.result_status === "degraded" ? "DEGRADED" : s.result_status === "healthy" ? "HEALTHY" : s.result_status ?? "executed"}
+                              {s.result_status === "degraded"
+                                ? "DEGRADED"
+                                : s.result_status === "healthy"
+                                  ? "HEALTHY"
+                                  : (s.result_status ?? "executed")}
                             </Badge>
                           </div>
-                          <div className="timeline-meta">step {s.order}{fmtConfidence(s.confidence)}</div>
+                          <div className="timeline-meta">
+                            step {s.order}
+                            {fmtConfidence(s.confidence)}
+                          </div>
                           {s.hypothesis && (
-                            <div className="timeline-body" style={{ color: "var(--text-secondary)", fontWeight: 500 }}>
+                            <div
+                              className="timeline-body"
+                              style={{ color: "var(--text-secondary)", fontWeight: 500 }}
+                            >
                               Hypothesis: {s.hypothesis}
                             </div>
                           )}
@@ -333,44 +445,64 @@ export default function IncidentPage() {
                       );
                     })}
 
-                    {/* Step N+1: Root Cause Hypothesis */}
+                    {/* Root Cause Hypothesis */}
                     {active.root_cause_candidate ? (
-                      <div className="timeline-item" style={{ animationDelay: `${steps.length * 60}ms` }}>
+                      <div
+                        className="timeline-item"
+                        style={{ animationDelay: `${steps.length * 60}ms` }}
+                      >
                         <div className="timeline-marker warn">!</div>
                         <div className="timeline-title">Root-cause hypothesis proposed</div>
                         <div className="timeline-meta">
-                          Layer: <span className="mono">{String(active.root_cause_candidate.layer)}</span>
+                          Layer:{" "}
+                          <span className="mono">
+                            {String(active.root_cause_candidate.layer)}
+                          </span>
                           {active.root_cause_candidate.confidence != null
                             ? ` · confidence ${(Number(active.root_cause_candidate.confidence) * 100).toFixed(0)}%`
                             : ""}
                         </div>
                         <div className="timeline-body">
-                          <div style={{ fontWeight: 650, color: "var(--text)", fontSize: 13.5 }}>
+                          <div
+                            style={{ fontWeight: 650, color: "var(--text)", fontSize: 13.5 }}
+                          >
                             {String(active.root_cause_candidate.root_cause)}
                           </div>
                           {active.root_cause_candidate.resolution != null && (
                             <div className="muted mt-4">
-                              Suggested resolution: <span className="mono">{String(active.root_cause_candidate.resolution)}</span>
+                              Suggested resolution:{" "}
+                              <span className="mono">
+                                {String(active.root_cause_candidate.resolution)}
+                              </span>
                             </div>
                           )}
                         </div>
                       </div>
                     ) : null}
 
-                    {/* Retained / Feedback Item */}
+                    {/* Retained */}
                     {active.retained_at && (
                       <div className="timeline-item">
                         <div className="timeline-marker ok">✓</div>
-                        <div className="timeline-title">Retained to Hindsight long-term memory</div>
-                        <div className="timeline-meta">Experience narrative ingested at {active.retained_at}</div>
+                        <div className="timeline-title">
+                          Retained to Hindsight long-term memory
+                        </div>
+                        <div className="timeline-meta">
+                          Experience narrative ingested at {active.retained_at}
+                        </div>
                       </div>
                     )}
 
+                    {/* Feedback */}
                     {active.feedback_kind && feedbackMeta && (
                       <div className="timeline-item">
                         <div className="timeline-marker ok">★</div>
-                        <div className="timeline-title">Engineer feedback: {feedbackMeta.label}</div>
-                        {active.feedback_text && <div className="timeline-body">{active.feedback_text}</div>}
+                        <div className="timeline-title">
+                          Engineer feedback: {feedbackMeta.label}
+                        </div>
+                        {active.feedback_text && (
+                          <div className="timeline-body">{active.feedback_text}</div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -383,7 +515,7 @@ export default function IncidentPage() {
             )}
           </Section>
 
-          {/* ---------- ENGINEER FEEDBACK & LEARNING LOOP ---------- */}
+          {/* ---------- FEEDBACK ---------- */}
           <Section
             eyebrow="Human-in-the-loop"
             title="Engineer feedback & learning"
@@ -435,11 +567,20 @@ export default function IncidentPage() {
                     </div>
                   </div>
 
-                  {/* Visual Learning Loop Ribbon */}
                   <div className="notice info" style={{ marginBottom: 0, marginTop: 4 }}>
                     <div style={{ fontSize: 12.5 }}>
-                      <div className="notice-title" style={{ fontSize: 13 }}>Learning Event Loop</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
+                      <div className="notice-title" style={{ fontSize: 13 }}>
+                        Learning Event Loop
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          flexWrap: "wrap",
+                          marginTop: 4,
+                        }}
+                      >
                         <span className="badge warning">Engineer Correction</span>
                         <span>→</span>
                         <span className="badge info">Hindsight Retention</span>
@@ -458,9 +599,9 @@ export default function IncidentPage() {
           </Section>
         </div>
 
-        {/* RIGHT COLUMN: LONG-TERM MEMORY & RESOLUTION */}
+        {/* ==================== RIGHT: MEMORY + RESOLUTION ==================== */}
         <div>
-          {/* ---------- HINDSIGHT LONG-TERM MEMORY ---------- */}
+          {/* ---------- HINDSIGHT MEMORY ---------- */}
           <Section
             eyebrow={<ContextTag kind="memory" />}
             title="Hindsight Memory"
@@ -475,15 +616,27 @@ export default function IncidentPage() {
                         <Icon kind="memory" size={12} />
                         {memory.ready ? "Hindsight Memory Ready" : "Memory Seeding"}
                       </span>
-                      <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: "var(--memory-text)" }}>
+                      <span
+                        className="mono"
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: "var(--memory-text)",
+                        }}
+                      >
                         {memory.recalled_count} experiences recalled
                       </span>
                     </div>
 
                     {memory.query && (
                       <div style={{ fontSize: 12, marginTop: 4 }}>
-                        <span className="faint" style={{ fontWeight: 600 }}>Recall Query:</span>
-                        <div className="mono mt-4" style={{ color: "var(--text)", fontSize: 11.5, wordBreak: "break-word" }}>
+                        <span className="faint" style={{ fontWeight: 600 }}>
+                          Recall Query:
+                        </span>
+                        <div
+                          className="mono mt-4"
+                          style={{ color: "var(--text)", fontSize: 11.5, wordBreak: "break-word" }}
+                        >
                           {memory.query}
                         </div>
                       </div>
@@ -498,7 +651,9 @@ export default function IncidentPage() {
                     </div>
                     <div className="chips">
                       {memory.incident_ids.slice(0, 8).map((iid) => (
-                        <span key={iid} className="chip highlight">{iid}</span>
+                        <span key={iid} className="chip highlight">
+                          {iid}
+                        </span>
                       ))}
                       {memory.incident_ids.length > 8 && (
                         <span className="chip ghost">+{memory.incident_ids.length - 8}</span>
@@ -509,7 +664,9 @@ export default function IncidentPage() {
 
                 {memory.memories.length > 0 && (
                   <div className="stack-8">
-                    <div className="faint" style={{ fontSize: 12, fontWeight: 600 }}>Recalled Experiences:</div>
+                    <div className="faint" style={{ fontSize: 12, fontWeight: 600 }}>
+                      Recalled Experiences:
+                    </div>
                     {memory.memories.slice(0, 3).map((m, i) => (
                       <MemoryCard
                         key={m.memory_id ?? i}
@@ -526,7 +683,9 @@ export default function IncidentPage() {
 
                 {memory.lessons.length > 0 && (
                   <div className="stack-8">
-                    <div className="faint" style={{ fontSize: 12, fontWeight: 600 }}>Replayed Lessons:</div>
+                    <div className="faint" style={{ fontSize: 12, fontWeight: 600 }}>
+                      Replayed Lessons:
+                    </div>
                     {memory.lessons.slice(0, 2).map((l, i) => (
                       <MemoryCard key={i} title={`Lesson ${i + 1}`} text={l} />
                     ))}
@@ -535,7 +694,8 @@ export default function IncidentPage() {
 
                 {memory.memories.length === 0 && memory.lessons.length === 0 && (
                   <Empty title="No past memories recalled">
-                    No matching history for this symptom pattern. Run tier-1 seed / replay on the dashboard to populate memory.
+                    No matching history for this symptom pattern. Run tier-1 seed / replay on the
+                    dashboard to populate memory.
                   </Empty>
                 )}
               </div>
@@ -561,7 +721,9 @@ export default function IncidentPage() {
                   </div>
                 ) : (
                   <div>
-                    <label className="field-label" htmlFor="resolution">Resolution fix applied</label>
+                    <label className="field-label" htmlFor="resolution">
+                      Resolution fix applied
+                    </label>
                     <div className="row" style={{ gap: 8 }}>
                       <input
                         id="resolution"
@@ -588,45 +750,5 @@ export default function IncidentPage() {
         </div>
       </div>
     </div>
-  );
-}
-
-function PageHeader({
-  id,
-  incident,
-}: {
-  id: string;
-  incident: Incident | null;
-}) {
-  const mainSymptom = incident?.symptoms[0] ?? "Investigation Workspace";
-  return (
-    <header className="page-header">
-      <div className="eyebrow">Investigation Workspace</div>
-      <div className="header-row">
-        <div>
-          <h1>
-            <span className="mono" style={{ color: "var(--accent)" }}>{id}</span>
-            {incident ? ` · ${mainSymptom}` : ""}
-          </h1>
-          <p className="lead">
-            {incident
-              ? `${incident.service} (${incident.environment}) · opened ${fmtShortDate(incident.timestamp)}`
-              : "Loading incident workspace…"}
-          </p>
-        </div>
-        <div className="header-actions">
-          {incident ? (
-            <>
-              <SeverityBadge severity={incident.severity} />
-              <TierBadge tier={incident.tier} />
-              <StatusBadge status={incident.status} />
-              <Badge tone="neutral">{incident.service}</Badge>
-            </>
-          ) : (
-            <Badge tone="neutral">…</Badge>
-          )}
-        </div>
-      </div>
-    </header>
   );
 }

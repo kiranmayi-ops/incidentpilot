@@ -151,7 +151,7 @@ cd frontend && npm run test
 cd frontend && npm run build
 ```
 
-Current: **75 backend tests, 17 frontend tests, clean `next build`.**
+Current: **75 backend tests, 31 frontend tests, clean `next build`.**
 
 ## Evaluation
 

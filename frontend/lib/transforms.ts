@@ -125,14 +125,20 @@ interface MetricDef {
   label: string;
   unit?: string;
   pct?: boolean;
+  /** Tone warn when the value is at or above this threshold. */
   warn?: number;
+  /** Tone bad when the value is at or above this threshold. */
   bad?: number;
+  /** Tone warn when the value falls below this threshold (e.g. throughput). */
+  warnBelow?: number;
+  /** Tone bad when the value falls below this threshold (e.g. throughput). */
+  badBelow?: number;
 }
 
 const METRIC_DEFS: MetricDef[] = [
   { key: "latency_p99_ms", label: "p99 latency", unit: " ms", warn: 300, bad: 1000 },
   { key: "error_rate_pct", label: "Error rate", unit: "%", warn: 2, bad: 5 },
-  { key: "throughput_rps", label: "Throughput", unit: " rps", warn: 300, bad: 100 },
+  { key: "throughput_rps", label: "Throughput", unit: " rps", warnBelow: 300, badBelow: 100 },
   { key: "db_connection_utilization", label: "DB connections", pct: true, warn: 0.6, bad: 0.85 },
   { key: "postgres_connection_utilization", label: "Postgres connections", pct: true, warn: 0.6, bad: 0.85 },
   { key: "redis_connection_utilization", label: "Redis connections", pct: true, warn: 0.6, bad: 0.85 },
@@ -162,6 +168,8 @@ export function formatMetrics(metrics: Record<string, number | string>): MetricV
       if (numeric !== null) {
         if (d.bad !== undefined && numeric >= d.bad) tone = "bad";
         else if (d.warn !== undefined && numeric >= d.warn) tone = "warn";
+        else if (d.badBelow !== undefined && numeric < d.badBelow) tone = "bad";
+        else if (d.warnBelow !== undefined && numeric < d.warnBelow) tone = "warn";
       }
       return { key: d.key, label: d.label, value, tone };
     });

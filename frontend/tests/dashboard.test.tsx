@@ -78,13 +78,15 @@ describe("DashboardPage", () => {
   it("renders counts derived from the mocked API responses", async () => {
     render(<DashboardPage />);
 
-    expect(await screen.findByRole("heading", { name: "Incident dashboard" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /Incident command deck/ }),
+    ).toBeInTheDocument();
 
     // dashboard stat cards derived from the incident list (one incident -> total 1)
     expect((await screen.findAllByText("Incidents")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("1").length).toBeGreaterThan(0);
     expect(await screen.findByText("Active (unresolved)")).toBeInTheDocument();
-    expect(await screen.findByText("Resolved")).toBeInTheDocument();
+    expect((await screen.findAllByText("Resolved")).length).toBeGreaterThan(0);
 
     // learned pattern row derived from /learning/strategy
     expect((await screen.findAllByText("check_redis")).length).toBeGreaterThan(0);
@@ -95,7 +97,7 @@ describe("DashboardPage", () => {
 
   it("shows a real Hindsight status from /health", async () => {
     render(<DashboardPage />);
-    await screen.findByRole("heading", { name: "Incident dashboard" });
+    await screen.findByRole("heading", { name: /Incident command deck/ });
     const oks = await screen.findAllByText("ok");
     expect(oks.length).toBeGreaterThan(0);
     expect((await screen.findAllByText("Hindsight")).length).toBeGreaterThan(0);
@@ -129,7 +131,9 @@ describe("DashboardPage", () => {
 
     render(<DashboardPage />);
 
-    expect(await screen.findByRole("heading", { name: "Incident dashboard" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /Incident command deck/ }),
+    ).toBeInTheDocument();
     expect((await screen.findAllByText("unconfigured")).length).toBeGreaterThan(0);
     expect(screen.queryByText(/Backend unreachable/)).not.toBeInTheDocument();
   });

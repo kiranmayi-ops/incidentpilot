@@ -3,7 +3,9 @@ import Link from "next/link";
 import { fmtShortDate } from "@/lib/transforms";
 
 /* ============================================================
-   IncidentPilot shared UI library — Professional SRE components
+   IncidentPilot — Mission Deck component library (v2)
+   Commander-console furniture: hero, pipeline stepper, gauges,
+   verdict banners, filter bars, tone-coded stats, VS panels.
    ============================================================ */
 
 /* ---------- Icon primitives ---------- */
@@ -12,7 +14,19 @@ export function Icon({
   kind,
   size = 16,
 }: {
-  kind: "memory" | "evidence" | "check" | "x" | "arrow" | "investigate" | "shield" | "activity" | "sparkles";
+  kind:
+    | "memory"
+    | "evidence"
+    | "check"
+    | "x"
+    | "arrow"
+    | "investigate"
+    | "shield"
+    | "activity"
+    | "sparkles"
+    | "search"
+    | "bolt"
+    | "user";
   size?: number;
 }) {
   const common = {
@@ -24,6 +38,7 @@ export function Icon({
     strokeWidth: 1.5,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
+    "aria-hidden": true as const,
   };
   switch (kind) {
     case "memory":
@@ -84,47 +99,300 @@ export function Icon({
           <path d="M8 1.5l1.2 3.8 3.8 1.2-3.8 1.2L8 11.5l-1.2-3.8L3 6.5l3.8-1.2L8 1.5z" />
         </svg>
       );
+    case "search":
+      return (
+        <svg {...common}>
+          <circle cx="7" cy="7" r="4.5" />
+          <path d="M10.5 10.5L14 14" />
+        </svg>
+      );
+    case "bolt":
+      return (
+        <svg {...common}>
+          <path d="M8.5 1.5L3.5 9h3.5l-.5 5.5L11.5 7H8l.5-5.5z" />
+        </svg>
+      );
+    case "user":
+      return (
+        <svg {...common}>
+          <circle cx="8" cy="5.5" r="2.5" />
+          <path d="M3 14c.5-2.5 2.5-4 5-4s4.5 1.5 5 4" />
+        </svg>
+      );
     default:
       return null;
   }
 }
 
-/* ---------- Product Story Banner ---------- */
+/* ---------- Hero (page-opening banner with headline stats) ---------- */
 
-export function StoryBanner() {
+export function Hero({
+  eyebrow,
+  title,
+  highlight,
+  sub,
+  stats,
+  actions,
+}: {
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  /** trailing portion of the title rendered with the gold→cyan gradient */
+  highlight?: ReactNode;
+  sub?: ReactNode;
+  stats?: Array<{ value: ReactNode; label: ReactNode; tone?: "gold" | "cyan" }>;
+  actions?: ReactNode;
+}) {
   return (
-    <div className="story-banner">
-      <div className="story-flow">
-        <div className="story-step active">
-          <span className="story-step-num">1</span>
-          <span>Incident Occurs</span>
+    <div className="hero">
+      <div className="hero-head">
+        <div>
+          {eyebrow && (
+            <div className="eyebrow" style={{ marginBottom: 8 }}>
+              {eyebrow}
+            </div>
+          )}
+          <h1 className="hero-title">
+            {title}
+            {highlight && <span className="grad"> {highlight}</span>}
+          </h1>
+          {sub && <p className="hero-sub">{sub}</p>}
         </div>
-        <span className="story-arrow">→</span>
-        <div className="story-step active">
-          <span className="story-step-num">2</span>
-          <span>Investigation</span>
+        {actions && <div className="hero-cta">{actions}</div>}
+      </div>
+      {stats && stats.length > 0 && (
+        <div className="hero-stats">
+          {stats.map((s, i) => (
+            <div className="hero-stat" key={i}>
+              <div className={`hero-stat-num${s.tone ? ` ${s.tone}` : ""}`}>{s.value}</div>
+              <div className="hero-stat-label">{s.label}</div>
+            </div>
+          ))}
         </div>
-        <span className="story-arrow">→</span>
-        <div className="story-step active">
-          <span className="story-step-num">3</span>
-          <span>Engineer Feedback</span>
+      )}
+    </div>
+  );
+}
+
+/* ---------- Pipeline (the 5-step product story, horizontal stepper) ------ */
+
+const PIPELINE_STEPS: Array<{
+  name: string;
+  sub: string;
+  tone?: "memory" | "evidence";
+}> = [
+  { name: "Incident Occurs", sub: "Symptoms + telemetry" },
+  { name: "Investigation", sub: "Strategy execution", tone: "evidence" },
+  { name: "Engineer Feedback", sub: "Accept / reject / correct" },
+  { name: "Hindsight Memory", sub: "Experience retained", tone: "memory" },
+  { name: "Future Strategy Shift", sub: "Next recall adapts" },
+];
+
+export function Pipeline() {
+  return (
+    <div className="pipeline" aria-label="How IncidentPilot learns">
+      {PIPELINE_STEPS.map((s, i) => (
+        <span key={s.name} style={{ display: "contents" }}>
+          {i > 0 && (
+            <span className="pipeline-arrow" aria-hidden>
+              <Icon kind="arrow" size={14} />
+            </span>
+          )}
+          <div className={`pipeline-step${s.tone ? ` ${s.tone}` : ""}`}>
+            <span className="pipeline-dot">{i + 1}</span>
+            <span>
+              <div className="pipeline-name">{s.name}</div>
+              <div className="pipeline-sub">{s.sub}</div>
+            </span>
+          </div>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/* Legacy alias — pages previously imported StoryBanner */
+export function StoryBanner() {
+  return <Pipeline />;
+}
+
+/* ---------- Gauge ring metric ---------- */
+
+export function Gauge({
+  pct,
+  label,
+  tone = "neutral",
+}: {
+  /** 0–100 */
+  pct: number;
+  label: string;
+  tone?: "ok" | "warn" | "bad" | "neutral";
+}) {
+  const R = 34;
+  const C = 2 * Math.PI * R;
+  const clamped = Math.max(0, Math.min(100, pct));
+  const color =
+    tone === "bad"
+      ? "var(--red)"
+      : tone === "warn"
+        ? "var(--amber)"
+        : tone === "ok"
+          ? "var(--green)"
+          : "var(--accent)";
+  return (
+    <div className="gauge" role="img" aria-label={`${label}: ${clamped}%`}>
+      <svg width="84" height="84" viewBox="0 0 84 84">
+        <circle className="gauge-track" cx="42" cy="42" r={R} fill="none" strokeWidth="7" />
+        <circle
+          className="gauge-fill"
+          cx="42"
+          cy="42"
+          r={R}
+          fill="none"
+          strokeWidth="7"
+          stroke={color}
+          strokeLinecap="round"
+          strokeDasharray={C}
+          strokeDashoffset={C - (clamped / 100) * C}
+        />
+      </svg>
+      <div className="gauge-center">
+        <div className="gauge-value" style={{ color }}>
+          {clamped}%
         </div>
-        <span className="story-arrow">→</span>
-        <div className="story-step active">
-          <span className="story-step-num">4</span>
-          <span>Hindsight Long-term Memory</span>
-        </div>
-        <span className="story-arrow">→</span>
-        <div className="story-step active">
-          <span className="story-step-num">5</span>
-          <span>Future Strategy Shift</span>
+        <div className="gauge-label" title={label}>
+          {label}
         </div>
       </div>
     </div>
   );
 }
 
-/* ---------- Context tags: CURRENT EVIDENCE vs LONG-TERM MEMORY ---------- */
+/* ---------- Metric card (gauge or text) ---------- */
+
+export function Metric({
+  label,
+  value,
+  tone,
+  pct,
+}: {
+  label: string;
+  value: string;
+  tone?: "ok" | "warn" | "bad";
+  /** when set, renders a gauge ring at this 0–100 percentage */
+  pct?: number;
+}) {
+  if (pct !== undefined) {
+    return (
+      <div className="metric-card">
+        <Gauge pct={pct} label={label} tone={tone ?? "neutral"} />
+      </div>
+    );
+  }
+  return (
+    <div className={`stat${tone ? ` tone-${tone}` : ""}`} style={{ padding: "12px 14px" }}>
+      <div className="stat-label" style={{ fontSize: 10.5 }}>
+        {label}
+      </div>
+      <div className="stat-value" style={{ fontSize: 19, marginTop: 2 }}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Filter bar ---------- */
+
+export function FilterBar({
+  query,
+  onQuery,
+  placeholder = "Search service, symptom, or ID…",
+  children,
+}: {
+  query: string;
+  onQuery: (q: string) => void;
+  placeholder?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="filter-bar">
+      <div className="filter-input">
+        <span className="filter-ic">
+          <Icon kind="search" size={14} />
+        </span>
+        <input
+          className="input"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder={placeholder}
+          aria-label="Filter incidents"
+        />
+      </div>
+      {children}
+    </div>
+  );
+}
+
+export function FilterChip({
+  on,
+  count,
+  onClick,
+  children,
+}: {
+  on: boolean;
+  count?: number;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button type="button" className={`filter-chip${on ? " on" : ""}`} onClick={onClick}>
+      {children}
+      {count !== undefined && <span className="cnt">{count}</span>}
+    </button>
+  );
+}
+
+/* ---------- Verdict banner (compare outcome) ---------- */
+
+export function Verdict({
+  changed,
+  before,
+  after,
+}: {
+  changed: boolean;
+  before?: string | null;
+  after?: string | null;
+}) {
+  return (
+    <div className={`verdict${changed ? "" : " changed-neutral"}`}>
+      <div className="verdict-icon">
+        <Icon kind={changed ? "bolt" : "shield"} size={22} />
+      </div>
+      <div>
+        <div className="verdict-title">
+          {changed
+            ? "Memory changed the first move"
+            : "No strategy change for this incident"}
+        </div>
+        <p className="verdict-sub">
+          {changed ? (
+            <>
+              Baseline opened at <span className="mono">{before}</span> — the memory-informed
+              agent opened at <span className="mono">{after}</span>. Hindsight recalled prior
+              engineer corrections for this symptom pattern.
+            </>
+          ) : (
+            <>
+              Both runs opened with <span className="mono">{before ?? "—"}</span>. Run the
+              scripted replay on the dashboard, then select INC-2001 to see the shift live.
+            </>
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Context tags ---------- */
 
 export function ContextTag({ kind }: { kind: "now" | "memory" }) {
   return (
@@ -198,16 +466,13 @@ export function StatusBadge({ status, dot }: { status?: string; dot?: boolean })
   if (!status) return null;
   const m = STATUS_MAP[status] ?? { label: status, tone: "neutral" as BadgeTone };
   return (
-    <Badge
-      tone={m.tone}
-      dot={dot ?? (status !== "completed" && status !== "resolved")}
-    >
+    <Badge tone={m.tone} dot={dot ?? (status !== "completed" && status !== "resolved")}>
       {m.label}
     </Badge>
   );
 }
 
-/* ---------- Redesigned Incident List Item Component ---------- */
+/* ---------- Incident list item ---------- */
 
 export function IncidentListItem({
   id,
@@ -242,16 +507,24 @@ export function IncidentListItem({
       <div className="incident-item-main">
         <div className="incident-item-title">
           {mainSymptom}
-          {extraCount > 0 && <span className="muted" style={{ fontWeight: 400, fontSize: 13, marginLeft: 6 }}>+(+{extraCount} more)</span>}
+          {extraCount > 0 && (
+            <span className="muted" style={{ fontWeight: 400, fontSize: 13, marginLeft: 6 }}>
+              +{extraCount} more
+            </span>
+          )}
         </div>
         <div className="incident-item-meta">
-          <span className="mono" style={{ fontWeight: 650, color: "var(--text)" }}>{service}</span>
+          <span className="mono" style={{ fontWeight: 650, color: "var(--text)" }}>
+            {service}
+          </span>
           <span className="meta-sep">·</span>
           <SeverityBadge severity={severity} />
           <span className="meta-sep">·</span>
           <StatusBadge status={status} />
           <span className="meta-sep">·</span>
-          <span className="mono" style={{ fontSize: 11.5 }}>{id}</span>
+          <span className="mono" style={{ fontSize: 11.5 }}>
+            {id}
+          </span>
           <span className="meta-sep">·</span>
           <span>{environment}</span>
           <span className="meta-sep">·</span>
@@ -272,7 +545,9 @@ export function IncidentListItem({
             {agentActivity.retained && <Badge tone="info">retained</Badge>}
           </div>
         ) : (
-          <span className="muted" style={{ fontSize: 12 }}>No run yet</span>
+          <span className="muted" style={{ fontSize: 12 }}>
+            No run yet
+          </span>
         )}
         <div className="incident-item-action">
           <span>Inspect</span>
@@ -310,7 +585,7 @@ export function Button({
   );
 }
 
-/* ---------- Stat ---------- */
+/* ---------- Stat (tone-coded left edge) ---------- */
 
 export function Stat({
   label,
@@ -324,7 +599,7 @@ export function Stat({
   hint?: string;
 }) {
   return (
-    <div className="stat">
+    <div className={`stat${tone ? ` tone-${tone}` : ""}`}>
       <div className="stat-label">
         {tone && <span className={`stat-dot ${tone}`} />}
         {label}
@@ -546,7 +821,7 @@ export function MemoryCard({
   );
 }
 
-/* ---------- Counter-Case Explanation Card ---------- */
+/* ---------- Counter-case explanation ---------- */
 
 export function CounterCaseCard() {
   return (
@@ -557,34 +832,16 @@ export function CounterCaseCard() {
           Current Evidence Overrides Memory (Counter-case Security)
         </div>
         <p style={{ marginTop: 4 }}>
-          Long-term memory is a prior — never an absolute mandate. When live telemetry (e.g. 96% DB connection utilization) contradicts past memory (e.g. Redis checks), the contradiction gate zeroes the stale historical prior and prioritizes current evidence.
+          Long-term memory is a prior — never an absolute mandate. When live telemetry (e.g. 96%
+          DB connection utilization) contradicts past memory (e.g. Redis checks), the
+          contradiction gate zeroes the stale historical prior and prioritizes current evidence.
         </p>
       </div>
     </div>
   );
 }
 
-/* ---------- Evidence / metrics ---------- */
-
-export function Metric({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "ok" | "warn" | "bad";
-}) {
-  return (
-    <div className="stat" style={{ padding: "12px 14px" }}>
-      <div className="stat-label" style={{ fontSize: 10.5 }}>
-        {tone && <span className={`stat-dot ${tone}`} />}
-        {label}
-      </div>
-      <div className="stat-value" style={{ fontSize: 18, marginTop: 2 }}>{value}</div>
-    </div>
-  );
-}
+/* ---------- Notices ---------- */
 
 export function Notice({
   tone = "neutral",
